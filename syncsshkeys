@@ -1,0 +1,367 @@
+#!/bin/bash
+#
+# syncsshkeys.sh - ensure that /etc/ssh and ~root/.ssh are synced with ssh key backup
+
+# parse args
+#
+USAGE="usage: $0 [-h] [-n] [-v] [-b bkuptree] [-r chroot] [-f]
+
+	-h		print this help message and then exit (def: don't)
+	-n		no not change any files, just echo commands (def: change)
+	-v		verbose rsync and debug messages (def: be silent)
+	-b bkuptree	ssh key backup tree directory (def: /usr/global/backup/ssh/current/\$HOSTNAME)
+	-r chroot	prepend /etc/ssh & /root/.ssh with chroot (def: chroot is /)
+	-f 		force backup to bkuptree"
+N_FLAG=
+V_FLAG=
+BKUPTREE="/usr/global/backup/ssh/current/$HOSTNAME"
+TIMESTAMP=$(date '+%Y%m%d.%H%M%S')
+CHROOT=		# effectively "/"
+F_FLAG=
+set -- $(/usr/bin/getopt hnvb:r:f $*)
+if [[ $? != 0 ]]; then
+    echo "$0: unknown or invalid -flag" 1>&2
+    echo "$USAGE" 1>&2
+    exit 3
+fi
+for i in $*; do
+    case $i in
+    -h) echo "$USAGE" 1>&2; exit 0 ;;
+    -n) N_FLAG="-n" ;;
+    -v) V_FLAG="-v" ;;
+    -b) BKUPTREE="$2" ; shift ;;
+    -r) CHROOT="$2" ; shift ;;
+    -f) F_FLAG="-f" ;;
+    --) shift; break ;;
+    esac
+    shift
+done
+if [[ $# != 0 ]]; then
+    echo "$USAGE" 1>&2
+    exit 4
+fi
+ORIG_F_FLAG="$F_FLAG"
+export N_FLAG V_FLAG BKUPTREE CHROOT F_FLAG TIMESTAMP ORIG_F_FLAG
+
+# setup
+#
+ETC_SSH_BKUP="$BKUPTREE/etc/ssh";
+ORIG_ETC_SSH_BKUP="$ETC_SSH_BKUP"
+export ETC_SSH_BKUP ORIG_ETC_SSH_BKUP
+ROOT_SSH_BKUP="$BKUPTREE/root/.ssh";
+ORIG_ROOT_SSH_BKUP="$ROOT_SSH_BKUP"
+export ROOT_SSH_BKUP ORIG_ROOT_SSH_BKUP
+
+# backup or restore /etc/ssh
+#
+ETC_SSH_OK=
+export ETC_SSH_OK
+if [[ -n "$V_FLAG" ]]; then
+    echo "on $HOSTNAME ensure $CHROOT/etc/ssh is a clone of $ETC_SSH_BKUP"
+fi
+if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
+
+    # nothing to restore, so backup new keys instead
+
+    # backup new /etc/ssh
+    #
+    #	-a		archive: clone and compare mode
+    #	--delete	remove dest things not found in src
+    #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
+    #	-v		be verbose
+    #
+    if [[ ! -d "$ETC_SSH_BKUP" ]]; then
+	echo "$0: Note: not a directory: $ETC_SSH_BKUP" 1>&2
+	if [[ ! -d "$CHROOT/etc/ssh" ]]; then
+	    echo "$0: FATAL: no directory to backup: $CHROOT/etc/ssh" 1>&2
+	    echo "$0: Note: aborting backup" 1>&2
+	    exit 5
+	fi
+	ETC_SSH_BKUP="$ETC_SSH_BKUP.$TIMESTAMP"
+	if [[ -n "$V_FLAG" ]]; then
+	   echo "$0: Note: will create a temporary backup directory: $ETC_SSH_BKUP"
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    mkdir -p "$ETC_SSH_BKUP"
+	    if [[ ! -d "$ETC_SSH_BKUP" ]]; then
+		echo "$0: FATAL: unable to create temporary backup directory: $ETC_SSH_BKUP" 1>&2
+		echo "$0: Note: aborting backup" 1>&2
+		exit 6
+	    fi
+	fi
+	echo "$0: Note: temporarly turning on -f flag: forcing backup of /etc/ssh" 1>&2
+	F_FLAG="-f"
+    fi
+    if [[ -n "$V_FLAG" ]]; then
+	if [[ -n "$F_FLAG" ]]; then
+	    echo "foring backup do to use of $F_FLAG"
+	fi
+	echo "on $HOSTNAME about to backup $CHROOT/etc/ssh/ to $ETC_SSH_BKUP"
+	echo rsync -a --delete -0 $V_FLAG $N_FLAG "$CHROOT/etc/ssh/" "$ETC_SSH_BKUP"
+    fi
+    if [[ -z "$N_FLAG" ]]; then
+	rsync -a --delete -0 $V_FLAG "$CHROOT/etc/ssh/" "$ETC_SSH_BKUP"
+	status="$?"
+    else
+	rsync -a --delete -0 $V_FLAG -n "$CHROOT/etc/ssh/" "$ETC_SSH_BKUP"
+    	status=0
+    fi
+    if [[ ! -d "$ETC_SSH_BKUP" ]]; then
+	echo "$0: Warning: status: $status unable create backup directory $ETC_SSH_BKUP" 1>&2
+    elif [[ "$status" -ne 0 ]]; then
+        echo "$0: Warning: status: $status backup failed for $CHROOT/etc/ssh to $ETC_SSH_BKUP" 1>&2
+    else
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "on $HOSTNAME successful backup of $CHROOT/etc/ssh to $ETC_SSH_BKUP"
+	fi
+	ETC_SSH_OK=true
+    fi
+    if [[ -n "$ETC_SSH_OK" && "$ETC_SSH_BKUP" != "$ORIG_ETC_SSH_BKUP" ]]; then
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "$0: Note: about to make temporary backup directory permanent: $ETC_SSH_BKUP" 1>&2
+	fi
+	if [[ -e "$ORIG_ETC_SSH_BKUP" ]]; then
+	    echo "$0: Warning: original backup directory was found: $ORIG_ETC_SSH_BKUP" 1>&2
+	    echo "$0: Warning: leaving temporary backup directory in place: $ETC_SSH_BKUP" 1>&2
+	    ETC_SSH_OK=
+	else
+	    mv -f "$ETC_SSH_BKUP" "$ORIG_ETC_SSH_BKUP"
+	    status="$?"
+	    if [[ ! -d "$ORIG_ETC_SSH_BKUP" ]]; then
+		echo "$0: Warning: status: $status move of temporary to permanent failed, $ORIG_ETC_SSH_BKUP not found" 1>&2
+		ETC_SSH_OK=
+	    elif [[ "$status" -ne 0 ]]; then
+		echo "$0: Warning: status: $status backup failed mv -f $ETC_SSH_BKUP $ORIG_ETC_SSH_BKUP" 1>&2
+		ETC_SSH_OK=
+	    else
+		if [[ -n "$V_FLAG" ]]; then
+		    echo "$0: Note: temporary backup directory now permanant: $ORIG_ETC_SSH_BKUP" 1>&2
+		fi
+		ETC_SSH_BKUP="$ORIG_ETC_SSH_BKUP"
+	    fi
+	fi
+    fi
+    if [[ "$F_FLAG" != "$ORIG_F_FLAG" ]]; then
+	echo "$0: Note: turning temporary setting of the -f flag back off" 1>&2
+	F_FLAG="$ORIG_F_FLAG"
+    fi
+
+else
+
+    # restore /etc/ssh as needed
+    #
+    #
+    #	-a		archive: clone and compare mode
+    #	--delete	remove dest things not found in src
+    #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
+    #	-v		be verbose
+    #
+    if [[ -n "$V_FLAG" ]]; then
+	echo "on $HOSTNAME about to restore $ETC_SSH_BKUP/ to $CHROOT/etc/ssh"
+	echo rsync -a --delete -0 $V_FLAG $N_FLAG "$ETC_SSH_BKUP/" "$CHROOT/etc/ssh"
+    fi
+    if [[ -z "$N_FLAG" ]]; then
+	rsync -a --delete -0 $V_FLAG "$ETC_SSH_BKUP/" "$CHROOT/etc/ssh"
+	status="$?"
+    else
+	rsync -a --delete -0 $V_FLAG -n "$ETC_SSH_BKUP/" "$CHROOT/etc/ssh"
+    	status=0
+    fi
+    if [[ ! -d "$CHROOT/etc/ssh" ]]; then
+	echo "$0: Warning: status: $status unable to create $CHROOT/etc/ssh for $HOSTNAME from $ETC_SSH_BKUP" 1>&2
+    elif [[ "$status" -ne 0 ]]; then
+       echo "$0: Warning: status: $status restore failed for $CHROOT/etc/ssh to $ETC_SSH_BKUP" 1>&2
+    else
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "on $HOSTNAME sucessful restore of $ETC_SSH_BKUP to $CHROOT/etc/ssh"
+	fi
+	ETC_SSH_OK=true
+    fi
+fi
+# paranoia
+if [[ -n "$ETC_SSH_OK" ]]; then
+    if [[ -n "$V_FLAG" ]]; then
+	echo diff -r "$CHROOT/etc/ssh" "$ETC_SSH_BKUP"
+    fi
+    diff -r "$CHROOT/etc/ssh" "$ETC_SSH_BKUP" >/dev/null 2>&1
+    status="$?"
+    if [[ "$status" -ne 0 ]]; then
+	echo "$0: Warning: diff status: $status, $CHROOT/etc/ssh differs from $ETC_SSH_BKUP"
+	ETC_SSH_OK=
+    elif [[ -n "$V_FLAG" ]]; then
+	echo "on $HOSTNAME contents of $CHROOT/etc/ssh matches $ETC_SSH_BKUP"
+    fi
+fi
+
+# backup or restore /root/.ssh
+#
+ROOT_SSH_OK=
+export ROOT_SSH_OK
+if [[ -n "$V_FLAG" ]]; then
+    echo "on $HOSTNAME ensure $CHROOT/root/.ssh is a clone of $ROOT_SSH_BKUP"
+fi
+if [[ ! -d "$ROOT_SSH_BKUP" || -n "$F_FLAG" ]]; then
+
+    # nothing to restore, so backup new keys instead
+
+    # backup new /root/.ssh
+    #
+    #	-a		archive: clone and compare mode
+    #	--delete	remove dest things not found in src
+    #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
+    #	-v		be verbose
+    #
+    if [[ ! -d "$ROOT_SSH_BKUP" ]]; then
+	echo "$0: Note: not a directory: $ROOT_SSH_BKUP" 1>&2
+	if [[ ! -d "$CHROOT/root/.ssh" ]]; then
+	    echo "$0: Note: no directory to backup, about to create: $CHROOT/root/.ssh" 1>&2
+	    if [[ -z "$N_FLAG" ]]; then
+		mkdir -p "$CHROOT/root/.ssh"
+		status="$?"
+		if [[ ! -d "$CHROOT/root/.ssh" ]]; then
+		    echo "$0: FATAL: status: $status could not create: $CHROOT/root/.ssh" 1>&2
+		    echo "$0: Note: aborting backup" 1>&2
+		    exit 6
+		elif [[ "$status" -ne 0 ]]; then
+		    echo "$0: FATAL: status: $status could not create: $CHROOT/root/.ssh" 1>&2
+		    echo "$0: Note: aborting backup" 1>&2
+		    exit 7
+		else
+		    echo "$0: Note: about to chmod 0700 $CHROOT/root/.ssh"
+		    chmod 0700 "$CHROOT/root/.ssh"
+		    status="$?"
+		    if [[ "$status" -ne 0 ]]; then
+			echo "$0: FATAL: status: $status failed to chmod 0700 $CHROOT/root/.ssh" 1>&2
+			echo "$0: Note: aborting backup" 1>&2
+			exit 8
+		    fi
+		fi
+	    fi
+	fi
+	ROOT_SSH_BKUP="$ROOT_SSH_BKUP.$TIMESTAMP"
+	if [[ -n "$V_FLAG" ]]; then
+	   echo "$0: Note: will create a temporary backup directory: $ROOT_SSH_BKUP"
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    mkdir -p "$ROOT_SSH_BKUP"
+	    if [[ ! -d "$ROOT_SSH_BKUP" ]]; then
+		echo "$0: FATAL: unable to create temporary backup directory: $ROOT_SSH_BKUP" 1>&2
+		echo "$0: Note: aborting backup" 1>&2
+		exit 6
+	    fi
+	fi
+	echo "$0: Note: temporarly turning on -f flag: forcing backup of /root/.ssh" 1>&2
+	F_FLAG="-f"
+    fi
+    if [[ -n "$V_FLAG" ]]; then
+	if [[ -n "$F_FLAG" ]]; then
+	    echo "foring backup do to use of $F_FLAG"
+	fi
+	echo "on $HOSTNAME about to backup $CHROOT/root/.ssh/ to $ROOT_SSH_BKUP"
+	echo rsync -a --delete -0 --exclude 'sock-*' $V_FLAG $N_FLAG "$CHROOT/root/.ssh/" "$ROOT_SSH_BKUP"
+    fi
+    if [[ -z "$N_FLAG" ]]; then
+	rsync -a --delete -0 --exclude 'sock-*' $V_FLAG "$CHROOT/root/.ssh/" "$ROOT_SSH_BKUP"
+	status="$?"
+    else
+	rsync -a --delete -0 --exclude 'sock-*' $V_FLAG -n "$CHROOT/root/.ssh/" "$ROOT_SSH_BKUP"
+    	status=0
+    fi
+    if [[ ! -d "$ROOT_SSH_BKUP" ]]; then
+	echo "$0: Warning: status: $status unable create backup directory $ROOT_SSH_BKUP" 1>&2
+    elif [[ "$status" -ne 0 ]]; then
+        echo "$0: Warning: status: $status backup failed for $CHROOT/root/.ssh to $ROOT_SSH_BKUP" 1>&2
+    else
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "on $HOSTNAME successful backup of $CHROOT/root/.ssh to $ROOT_SSH_BKUP"
+	fi
+	ROOT_SSH_OK=true
+    fi
+    if [[ -n "$ROOT_SSH_OK" && "$ROOT_SSH_BKUP" != "$ORIG_ROOT_SSH_BKUP" ]]; then
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "$0: Note: about to make temporary backup directory permanent: $ROOT_SSH_BKUP" 1>&2
+	fi
+	if [[ -e "$ORIG_ROOT_SSH_BKUP" ]]; then
+	    echo "$0: Warning: original backup directory was found: $ORIG_ROOT_SSH_BKUP" 1>&2
+	    echo "$0: Warning: leaving temporary backup directory in place: $ROOT_SSH_BKUP" 1>&2
+	    ROOT_SSH_OK=
+	else
+	    mv -f "$ROOT_SSH_BKUP" "$ORIG_ROOT_SSH_BKUP"
+	    status="$?"
+	    if [[ ! -d "$ORIG_ROOT_SSH_BKUP" ]]; then
+		echo "$0: Warning: status: $status move of temporary to permanent failed, $ORIG_ROOT_SSH_BKUP not found" 1>&2
+		ROOT_SSH_OK=
+	    elif [[ "$status" -ne 0 ]]; then
+		echo "$0: Warning: status: $status backup failed mv -f $ROOT_SSH_BKUP $ORIG_ROOT_SSH_BKUP" 1>&2
+		ROOT_SSH_OK=
+	    else
+		if [[ -n "$V_FLAG" ]]; then
+		    echo "$0: Note: temporary backup directory now permanant: $ORIG_ROOT_SSH_BKUP" 1>&2
+		fi
+		ROOT_SSH_BKUP="$ORIG_ROOT_SSH_BKUP"
+	    fi
+	fi
+    fi
+    if [[ "$F_FLAG" != "$ORIG_F_FLAG" ]]; then
+	echo "$0: Note: turning temporary setting of the -f flag back off" 1>&2
+	F_FLAG="$ORIG_F_FLAG"
+    fi
+
+else
+
+    # restore /root/.ssh as needed
+    #
+    #
+    #	-a		archive: clone and compare mode
+    #	--delete	remove dest things not found in src
+    #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
+    #	-v		be verbose
+    #
+    if [[ -n "$V_FLAG" ]]; then
+	echo "on $HOSTNAME about to restore $ETC_SSH_BKUP/ to $CHROOT/root/.ssh"
+	echo rsync -a --delete -0 --exclude 'sock-*' $V_FLAG $N_FLAG "$ROOT_SSH_BKUP/" "$CHROOT/root/.ssh"
+    fi
+    if [[ -z "$N_FLAG" ]]; then
+	rsync -a --delete -0 --exclude 'sock-*' $V_FLAG "$ROOT_SSH_BKUP/" "$CHROOT/root/.ssh"
+	status="$?"
+    else
+	rsync -a --delete -0 --exclude 'sock-*' $V_FLAG -n "$ROOT_SSH_BKUP/" "$CHROOT/root/.ssh"
+	status=0
+    fi
+    if [ ! -d "$CHROOT/root/.ssh" ]; then
+	echo "$0: Warning: status: $status unable to create $CHROOT/root/.ssh for $HOSTNAME from $ROOT_SSH_BKUP" 1>&2
+    elif [ "$status" -ne 0 ]; then
+       echo "$0: Warning: status: $status restore failed for $CHROOT/root/.ssh to $ROOT_SSH_BKUP" 1>&2
+    else
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "on $HOSTNAME sucessful restore of $ROOT_SSH_BKUP to $CHROOT/root/.ssh"
+	fi
+	ROOT_SSH_OK=true
+    fi
+fi
+# paranoia
+if [[ -n "$ROOT_SSH_OK" ]]; then
+    if [[ -n "$V_FLAG" ]]; then
+	echo diff --exclude='sock-*' -r "$CHROOT/root/.ssh" "$ROOT_SSH_BKUP"
+    fi
+    diff --exclude='sock-*' -r "$CHROOT/root/.ssh" "$ROOT_SSH_BKUP" >/dev/null 2>&1
+    status="$?"
+    if [[ "$status" -ne 0 ]]; then
+	echo "$0: Warning: diff status: $status, $CHROOT/root/.ssh differs from $ROOT_SSH_BKUP"
+	ROOT_SSH_OK=
+    elif [[ -n "$V_FLAG" ]]; then
+	echo "on $HOSTNAME contents of $CHROOT/root/.ssh matches $ROOT_SSH_BKUP"
+    fi
+fi
+
+# All Done!!! - Jessica Noll, Age 2
+#
+if [[ -z "$ETC_SSH_OK" ]]; then
+    echo "$0: Error: on $HOSTNAME processing of $CHROOT/etc/ssh was not successful" 1>&2
+    exit 1
+fi
+if [[ -z "$ROOT_SSH_OK" ]]; then
+    echo "$0: Error: on $HOSTNAME processing of $CHROOT/root/.ssh was not successful" 1>&2
+    exit 2
+fi
+exit 0
