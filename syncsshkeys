@@ -321,15 +321,15 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
 	    if [[ -n "$V_FLAG" ]]; then
 		if [[ -z "$N_FLAG" ]]; then
 		    echo "$0: Notice: will attempt to chgrp $GROUP system key files under $ETC_SSH_BKUP"
-		    find "$ETC_SSH_BKUP" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
+		    find "$ETC_SSH_BKUP" -mindepth 1 -maxdepth 1 -type f -iname '*_key' -print0 |
 			xargs -0 --max-args=1 --no-run-if-empty --verbose chgrp "$GROUP"
 		else
 		    echo "$0: Notice: do to -n, will simulate chgrp $GROUP system key files under $ETC_SSH_BKUP"
-		    find "$ETC_SSH_BKUP" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
+		    find "$ETC_SSH_BKUP" -mindepth 1 -maxdepth 1 -type f -iname '*_key' -print0 |
 			xargs -0 --max-args=1 --no-run-if-empty --verbose echo chgrp "$GROUP"
 		fi
 	    elif [[ -z "$N_FLAG" ]]; then
-		find "$ETC_SSH_BKUP" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
+		find "$ETC_SSH_BKUP" -mindepth 1 -maxdepth 1 -type f -iname '*_key' -print0 |
 		    xargs -0 --max-args=1 --no-run-if-empty chgrp "$GROUP"
 	    fi
 	fi
@@ -382,15 +382,15 @@ else
 	    if [[ -n "$V_FLAG" ]]; then
 		if [[ -z "$N_FLAG" ]]; then
 		    echo "$0: Notice: will attempt to chgrp $GROUP system key files under $CHROOT/etc/ssh"
-		    find "$CHROOT/etc/ssh" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
+		    find "$CHROOT/etc/ssh" -mindepth 1 -maxdepth 1 -type f -iname '*_key' -print0 |
 			xargs -0 --max-args=1 --no-run-if-empty --verbose chgrp "$GROUP"
 		else
 		    echo "$0: Notice: due to -n, will simulate chgrp $GROUP system key files under $CHROOT/etc/ssh"
-		    find "$CHROOT/etc/ssh" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
+		    find "$CHROOT/etc/ssh" -mindepth 1 -maxdepth 1 -type f -iname '*_key' -print0 |
 			xargs -0 --max-args=1 --no-run-if-empty --verbose echo chgrp "$GROUP"
 		fi
 	    elif [[ -z "$N_FLAG" ]]; then
-		find "$CHROOT/etc/ssh" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
+		find "$CHROOT/etc/ssh" -mindepth 1 -maxdepth 1 -type f -iname '*_key' -print0 |
 		    xargs -0 --max-args=1 --no-run-if-empty chgrp "$GROUP"
 	    fi
 	fi
