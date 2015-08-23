@@ -160,7 +160,7 @@ if [[ -n "$E_FLAG" ]]; then
 	echo "$0: FATAL: -e and bkuptree/etc/ssh is not a directory: $ETC_SSH_BKUP" 1>&2
 	echo "$0: FATAL: aborting backup exit code: 6" 1>&2
 	exit 6
-    elif [[ ! -d "$ROOT_SSH_BKUP") ]]; then
+    elif [[ ! -d "$ROOT_SSH_BKUP" ]]; then
 	echo "$0: FATAL: -e and bkuptree/root/.ssh is not a directory: $ROOT_SSH_BKUP" 1>&2
 	echo "$0: FATAL: aborting backup exit code: 7" 1>&2
 	exit 7
