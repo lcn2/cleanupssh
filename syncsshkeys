@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# syncsshkeys - ensure that /etc/ssh and ~root/.ssh are synced with ssh key backup
+# syncsshkeys - sync /etc/ssh & ~root/.ssh with ssh key backup tree
 #
 # Copyright (c) 2015 by Landon Curt Noll.  All Rights Reserved.
 #
@@ -33,16 +33,17 @@ USAGE="usage: $0 [-h] [-n] [-v] [-b bkuptree] [-r chroot] [-f] [-e] [-w whoami]
 		 [-g ssh_keys] [-c]
 
 	-h		print this help message and then exit (def: don't)
-	-n		no not change any files, just echo commands (def: change)
+	-n		don't change any files, just echo commands (def: change)
 	-v		verbose rsync and debug messages (def: be silent)
 	-b bkuptree	ssh key backup tree directory
 			    (def: $BKUPTREE)
-	-r chroot	prepend /etc/ssh & /root/.ssh with chroot (def: chroot is /)
-	-f 		force backup into bkuptree (def: restore if bkuptree is a dir)
+	-r chroot	prepend chroot to /etc/ssh & /root/.ssh (def: don't)
+	-f 		force backup into bkuptree
+			   (def: restore if bkuptree is a dir)
 	-e		bkuptree already must exist (def: create as needed)
 	-w whoami	use hostname: whoami (def: use $HOSTNANE)
-	-g ssh_keys	change the chgrp group (def: chgrp with group: ssh_keys)
-	-c		do not chgrp system key files (def: chgrp ssh_keys)
+	-g ssh_keys	change the chgrp group (def: chgrp ssh_keys)
+	-c		do not chgrp system key files (def: do chgrp)
 
     NOTE: Without -f, if this bkuptree directory exists, then
 	  system & root ssh files will be restored from the bkuptree,
@@ -50,39 +51,46 @@ USAGE="usage: $0 [-h] [-n] [-v] [-b bkuptree] [-r chroot] [-f] [-e] [-w whoami]
 
 	    $BKUPTREE
 
-	  Without -e, without -f, and if the bkuptree directory does NOT exist, then
-	  a backup (instread of a restore) into the bkuptree directory will be forced.
+	  Without -e, without -f, and
+	    if the bkuptree directory does NOT exist, then
+	  instead of a restore a backup into the bkuptree directory will occur.
 
-	  With -e, without -f, and if the bkuptree directory does NOT exist, then
+	  With -e, without -f, and
+	    if the bkuptree directory does NOT exist, then
 	  this command will abort.
 
 	  Use of -e without -f forces a RESTORE ONLY mode.
 
     NOTE: With -f, system & root ssh files will be backuped into bkuptree,
-          which by default is:
+	  which by default is:
 
 	    $BKUPTREE
 
-	  Without -e, with -f, if the bkuptree directory does NOT exist, then
-	  the bkuptree (& required sub-directories) will attempted to be created.
+	  Without -e, with -f, and
+	    if the bkuptree directory does NOT exist, then
+	  the bkuptree (and its sub-dirs) will attempted to be created.
 
-	  With -e, with -f, if the bkuptree directory does NOT exist, then
+	  With -e, with -f, and
+	    if the bkuptree directory does NOT exist, then
 	  this command will abort.
 
 	  Use of -e with -f forces a BACKUP ONLY mode.
 
     NOTE: System ssh files are under the /etc/ssh directory.
-    	  Root ssh files are under the /root/.ssh directory.
+	  Root ssh files are under the /root/.ssh directory.
 	  Those directories, in turn, will be under the chroot & bkuptree dirs.
 
     NOTE: When restoring, and unless prevented by -c, system key files under
-    	  /etc/ssh will be chgrp-ed with the ssh_key group.
+	  /etc/ssh will be chgrp-ed with the ssh_key group.
 
-    NOTE: When backing up, and unless prevented by -c, system key files under
-    	  $BKUPTREE will be chgrp-ed with the ssh_key group.
+    NOTE: When backing up, and unless prevented by -c, system key files under:
+
+	    $BKUPTREE
+
+	  will be chgrp-ed with the ssh_key group.
 
     NOTE: System key files are any *_key file that exists.
-	  These are often these files:
+	  Th most common System key files are:
 
 	    ssh_host_ecdsa_key ssh_host_ed25519_key ssh_host_rsa_key"
 GROUP="ssh_keys"
@@ -108,7 +116,7 @@ for i in $*; do
     -r) CHROOT="$2" ; shift ;;
     -f) F_FLAG="-f" ;;
     -w) HOSTNAME="$2";
-    	BKUPTREE="/usr/global/backup/ssh/current/$2";
+	BKUPTREE="/usr/global/backup/ssh/current/$2";
 	shift ;;
     -g) GROUP="$2" ; shift ;;
     -c) C_FLAG="-c" ;;
@@ -134,10 +142,10 @@ fi
 
 # setup
 #
-ETC_SSH_BKUP="$BKUPTREE/etc/ssh";
+ETC_SSH_BKUP="$BKUPTREE/etc/ssh"
 ORIG_ETC_SSH_BKUP="$ETC_SSH_BKUP"
 export ETC_SSH_BKUP ORIG_ETC_SSH_BKUP
-ROOT_SSH_BKUP="$BKUPTREE/root/.ssh";
+ROOT_SSH_BKUP="$BKUPTREE/root/.ssh"
 ORIG_ROOT_SSH_BKUP="$ROOT_SSH_BKUP"
 export ROOT_SSH_BKUP ORIG_ROOT_SSH_BKUP
 
@@ -168,6 +176,7 @@ if [[ -n "$E_FLAG" ]]; then
 elif [[ -n "$V_FLAG" ]]; then
     if [[ ! -e "$BKUPTREE" ]]; then
 	echo "$0: Notice: bkuptree directory does not exist: $BKUPTREE"
+	echo "$0: Notice: will soon attempt to create: $BKUPTREE"
     elif [[ ! -d "$BKUPTREE" ]]; then
 	echo "$0: Warning: bkuptree exists but is not a directory: $BKUPTREE"
     else
@@ -175,6 +184,7 @@ elif [[ -n "$V_FLAG" ]]; then
     fi
     if [[ ! -e "$ETC_SSH_BKUP" ]]; then
 	echo "$0: Notice: bkuptree/etc/ssh directory does not exist: $ETC_SSH_BKUP"
+	echo "$0: Notice: will soon attempt to create: $ETC_SSH_BKUP"
 	if [[ ! -w "$BKUPTREE" ]]; then
 	    echo "$0: Warning: may not be able to create due to non-writable directory: $BKUPTREE"
 	fi
@@ -188,6 +198,7 @@ elif [[ -n "$V_FLAG" ]]; then
     fi
     if [[ ! -e "$ROOT_SSH_BKUP" ]]; then
 	echo "$0: Notice: bkuptree/root/.ssh directory does not exist: $ROOT_SSH_BKUP"
+	echo "$0: Notice: will soon attempt to create: $ROOT_SSH_BKUP"
 	if [[ ! -w "$BKUPTREE" ]]; then
 	    echo "$0: Warning: may not be able to create due to non-writable directory: $BKUPTREE"
 	fi
@@ -246,7 +257,7 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
     #
     if [[ -n "$V_FLAG" ]]; then
 	if [[ -n "$F_FLAG" ]]; then
-	    echo "$0: Notice: foring backup do to use of $F_FLAG"
+	    echo "$0: Notice: foring backup do to use of -f"
 	fi
 	echo "$0: Notice: on $HOSTNAME about to backup $CHROOT/etc/ssh/ to $ETC_SSH_BKUP"
 	echo rsync -a --delete -0 $V_FLAG $N_FLAG "$CHROOT/etc/ssh/" "$ETC_SSH_BKUP"
@@ -256,7 +267,7 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
 	status="$?"
     else
 	rsync -a --delete -0 $V_FLAG -n "$CHROOT/etc/ssh/" "$ETC_SSH_BKUP"
-    	status=0
+	status=0
     fi
 
     # rsync success or failure processing
@@ -264,7 +275,7 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
     if [[ ! -d "$ETC_SSH_BKUP" ]]; then
 	echo "$0: Warning: status: $status unable create backup directory $ETC_SSH_BKUP" 1>&2
     elif [[ "$status" -ne 0 ]]; then
-        echo "$0: Warning: status: $status backup failed for $CHROOT/etc/ssh to $ETC_SSH_BKUP" 1>&2
+	echo "$0: Warning: status: $status backup failed for $CHROOT/etc/ssh to $ETC_SSH_BKUP" 1>&2
     else
 	if [[ -n "$V_FLAG" ]]; then
 	    echo "$0: Notice: on $HOSTNAME successful backup of $CHROOT/etc/ssh to $ETC_SSH_BKUP"
@@ -312,14 +323,14 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
 		    echo "$0: Notice: will attempt to chgrp $GROUP system key files under $ETC_SSH_BKUP"
 		    find "$ETC_SSH_BKUP" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
 			xargs -0 --max-args=1 --no-run-if-empty --verbose chgrp "$GROUP"
-	    	else
+		else
 		    echo "$0: Notice: do to -n, will simulate chgrp $GROUP system key files under $ETC_SSH_BKUP"
 		    find "$ETC_SSH_BKUP" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
 			xargs -0 --max-args=1 --no-run-if-empty --verbose echo chgrp "$GROUP"
-	    	fi
+		fi
 	    elif [[ -z "$N_FLAG" ]]; then
 		find "$ETC_SSH_BKUP" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
-	    	    xargs -0 --max-args=1 --no-run-if-empty chgrp "$GROUP"
+		    xargs -0 --max-args=1 --no-run-if-empty chgrp "$GROUP"
 	    fi
 	fi
     elif [[ -n "$V_FLAG" ]]; then
@@ -346,7 +357,7 @@ else
 	status="$?"
     else
 	rsync -a --delete -0 $V_FLAG -n "$ETC_SSH_BKUP/" "$CHROOT/etc/ssh"
-    	status=0
+	status=0
     fi
 
     # rsync success or failure processing
@@ -377,10 +388,10 @@ else
 		    echo "$0: Notice: due to -n, will simulate chgrp $GROUP system key files under $CHROOT/etc/ssh"
 		    find "$CHROOT/etc/ssh" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
 			xargs -0 --max-args=1 --no-run-if-empty --verbose echo chgrp "$GROUP"
-	    	fi
+		fi
 	    elif [[ -z "$N_FLAG" ]]; then
 		find "$CHROOT/etc/ssh" -type f -mindepth 1 -maxdepth 1 -iname '*_key' -print0 |
-	    	    xargs -0 --max-args=1 --no-run-if-empty chgrp "$GROUP"
+		    xargs -0 --max-args=1 --no-run-if-empty chgrp "$GROUP"
 	    fi
 	fi
     elif [[ -n "$V_FLAG" ]]; then
@@ -479,7 +490,7 @@ if [[ ! -d "$ROOT_SSH_BKUP" || -n "$F_FLAG" ]]; then
 	status="$?"
     else
 	rsync -a --delete -0 --exclude 'sock-*' $V_FLAG -n "$CHROOT/root/.ssh/" "$ROOT_SSH_BKUP"
-    	status=0
+	status=0
     fi
 
     # rsync success or failure processing
@@ -487,7 +498,7 @@ if [[ ! -d "$ROOT_SSH_BKUP" || -n "$F_FLAG" ]]; then
     if [[ ! -d "$ROOT_SSH_BKUP" ]]; then
 	echo "$0: Warning: status: $status unable create backup directory $ROOT_SSH_BKUP" 1>&2
     elif [[ "$status" -ne 0 ]]; then
-        echo "$0: Warning: status: $status backup failed for $CHROOT/root/.ssh to $ROOT_SSH_BKUP" 1>&2
+	echo "$0: Warning: status: $status backup failed for $CHROOT/root/.ssh to $ROOT_SSH_BKUP" 1>&2
     else
 	if [[ -n "$V_FLAG" ]]; then
 	    echo "$0: Notice: on $HOSTNAME successful backup of $CHROOT/root/.ssh to $ROOT_SSH_BKUP"
