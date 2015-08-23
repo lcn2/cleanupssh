@@ -314,7 +314,7 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
 
     # chgrp system key files of all was OK and no -c
     #
-    if [[ -n "$C_FLAG" ]]; then
+    if [[ -z "$C_FLAG" ]]; then
 	if [[ -z "$ETC_SSH_OK" ]]; then
 	    echo "$0: Warning: due to issues, skipping chgrp $GROUP system key files under $ETC_SSH_BKUP" 1>&2
 	else
@@ -375,7 +375,7 @@ else
 
     # chgrp system key files of all was OK and no -c
     #
-    if [[ -n "$C_FLAG" ]]; then
+    if [[ -z "$C_FLAG" ]]; then
 	if [[ -z "$ETC_SSH_OK" ]]; then
 	    echo "$0: Warning: due to issues, skipping chgrp $GROUP system key files under $CHROOT/etc/ssh" 1>&2
 	else
