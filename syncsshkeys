@@ -334,7 +334,7 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
 	    fi
 	fi
     elif [[ -n "$V_FLAG" ]]; then
-	echo "$0: Notice: -c disabled chgrp $GROUP of system key files under $ETC_SSH_BKUP" 1>&2
+	echo "$0: Notice: use of -c disabled chgrp $GROUP of system key files under $ETC_SSH_BKUP" 1>&2
     fi
 
 else
@@ -395,7 +395,7 @@ else
 	    fi
 	fi
     elif [[ -n "$V_FLAG" ]]; then
-	echo "$0: Notice: -c disabled chgrp $GROUP of system key files under $CHROOT/etc/ssh" 1>&2
+	echo "$0: Notice: use of -c disabled chgrp $GROUP of system key files under $CHROOT/etc/ssh" 1>&2
     fi
 fi
 #
