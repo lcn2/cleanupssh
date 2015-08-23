@@ -4,17 +4,20 @@
 
 # parse args
 #
+BKUPTREE="/usr/global/backup/ssh/current/$HOSTNAME"
 USAGE="usage: $0 [-h] [-n] [-v] [-b bkuptree] [-r chroot] [-f]
 
 	-h		print this help message and then exit (def: don't)
 	-n		no not change any files, just echo commands (def: change)
 	-v		verbose rsync and debug messages (def: be silent)
-	-b bkuptree	ssh key backup tree directory (def: /usr/global/backup/ssh/current/\$HOSTNAME)
+	-b bkuptree	ssh key backup tree directory (def: $BACKUPTREE)
 	-r chroot	prepend /etc/ssh & /root/.ssh with chroot (def: chroot is /)
-	-f 		force backup to bkuptree"
+	-f 		force backup to bkuptree (def: restore if bkuptree is a dir)
+
+    NOTE: By default, if bkuptree directory exists: $BKUPTREE
+	  then system & root ssh files will be restored that directory."
 N_FLAG=
 V_FLAG=
-BKUPTREE="/usr/global/backup/ssh/current/$HOSTNAME"
 TIMESTAMP=$(date '+%Y%m%d.%H%M%S')
 CHROOT=		# effectively "/"
 F_FLAG=
@@ -52,7 +55,7 @@ ROOT_SSH_BKUP="$BKUPTREE/root/.ssh";
 ORIG_ROOT_SSH_BKUP="$ROOT_SSH_BKUP"
 export ROOT_SSH_BKUP ORIG_ROOT_SSH_BKUP
 
-# backup or restore /etc/ssh
+# backup or restore of system ssh keys under /etc/ssh
 #
 ETC_SSH_OK=
 export ETC_SSH_OK
@@ -61,14 +64,7 @@ if [[ -n "$V_FLAG" ]]; then
 fi
 if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
 
-    # nothing to restore, so backup new keys instead
-
-    # backup new /etc/ssh
-    #
-    #	-a		archive: clone and compare mode
-    #	--delete	remove dest things not found in src
-    #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
-    #	-v		be verbose
+    # backup new /etc/ssh or forced backup of exising /etc/ssh
     #
     if [[ ! -d "$ETC_SSH_BKUP" ]]; then
 	echo "$0: Note: not a directory: $ETC_SSH_BKUP" 1>&2
@@ -92,6 +88,16 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
 	echo "$0: Note: temporarly turning on -f flag: forcing backup of /etc/ssh" 1>&2
 	F_FLAG="-f"
     fi
+
+    # perform rsync backup from /etc/ssh into bkuptree/etc/ssh
+    #
+    # FYI: regarding sync args used:
+    #
+    #	-a		archive: clone and compare mode
+    #	--delete	remove dest things not found in src
+    #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
+    #	-v		be verbose (if -v was given as an arg)
+    #
     if [[ -n "$V_FLAG" ]]; then
 	if [[ -n "$F_FLAG" ]]; then
 	    echo "foring backup do to use of $F_FLAG"
@@ -106,6 +112,9 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
 	rsync -a --delete -0 $V_FLAG -n "$CHROOT/etc/ssh/" "$ETC_SSH_BKUP"
     	status=0
     fi
+
+    # rsync success or failure processing
+    #
     if [[ ! -d "$ETC_SSH_BKUP" ]]; then
 	echo "$0: Warning: status: $status unable create backup directory $ETC_SSH_BKUP" 1>&2
     elif [[ "$status" -ne 0 ]]; then
@@ -148,13 +157,14 @@ if [[ ! -d "$ETC_SSH_BKUP" || -n "$F_FLAG" ]]; then
 
 else
 
-    # restore /etc/ssh as needed
+    # perform rsync restore from bkuptree/etc/ssh to /etc/ssh
     #
+    # FYI: regarding sync args used:
     #
     #	-a		archive: clone and compare mode
     #	--delete	remove dest things not found in src
     #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
-    #	-v		be verbose
+    #	-v		be verbose (if -v was given as an arg)
     #
     if [[ -n "$V_FLAG" ]]; then
 	echo "on $HOSTNAME about to restore $ETC_SSH_BKUP/ to $CHROOT/etc/ssh"
@@ -167,6 +177,9 @@ else
 	rsync -a --delete -0 $V_FLAG -n "$ETC_SSH_BKUP/" "$CHROOT/etc/ssh"
     	status=0
     fi
+
+    # rsync success or failure processing
+    #
     if [[ ! -d "$CHROOT/etc/ssh" ]]; then
 	echo "$0: Warning: status: $status unable to create $CHROOT/etc/ssh for $HOSTNAME from $ETC_SSH_BKUP" 1>&2
     elif [[ "$status" -ne 0 ]]; then
@@ -178,7 +191,9 @@ else
 	ETC_SSH_OK=true
     fi
 fi
-# paranoia
+#
+# paranoia - compare /etc/ssh with bkuptree/etc/ssh
+#
 if [[ -n "$ETC_SSH_OK" ]]; then
     if [[ -n "$V_FLAG" ]]; then
 	echo diff -r "$CHROOT/etc/ssh" "$ETC_SSH_BKUP"
@@ -193,7 +208,7 @@ if [[ -n "$ETC_SSH_OK" ]]; then
     fi
 fi
 
-# backup or restore /root/.ssh
+# backup or restore of root ssh keys under /root/.ssh
 #
 ROOT_SSH_OK=
 export ROOT_SSH_OK
@@ -202,14 +217,7 @@ if [[ -n "$V_FLAG" ]]; then
 fi
 if [[ ! -d "$ROOT_SSH_BKUP" || -n "$F_FLAG" ]]; then
 
-    # nothing to restore, so backup new keys instead
-
-    # backup new /root/.ssh
-    #
-    #	-a		archive: clone and compare mode
-    #	--delete	remove dest things not found in src
-    #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
-    #	-v		be verbose
+    # backup new /root/.ssh or force backup of existing /root/.ssh
     #
     if [[ ! -d "$ROOT_SSH_BKUP" ]]; then
 	echo "$0: Note: not a directory: $ROOT_SSH_BKUP" 1>&2
@@ -253,6 +261,16 @@ if [[ ! -d "$ROOT_SSH_BKUP" || -n "$F_FLAG" ]]; then
 	echo "$0: Note: temporarly turning on -f flag: forcing backup of /root/.ssh" 1>&2
 	F_FLAG="-f"
     fi
+
+    # perform rsync backup from /root/.ssh into bkuptree/root/.ssh
+    #
+    # FYI: regarding sync args used:
+    #
+    #	-a		archive: clone and compare mode
+    #	--delete	remove dest things not found in src
+    #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
+    #	-v		be verbose (if -v was given as an arg)
+    #
     if [[ -n "$V_FLAG" ]]; then
 	if [[ -n "$F_FLAG" ]]; then
 	    echo "foring backup do to use of $F_FLAG"
@@ -267,6 +285,9 @@ if [[ ! -d "$ROOT_SSH_BKUP" || -n "$F_FLAG" ]]; then
 	rsync -a --delete -0 --exclude 'sock-*' $V_FLAG -n "$CHROOT/root/.ssh/" "$ROOT_SSH_BKUP"
     	status=0
     fi
+
+    # rsync success or failure processing
+    #
     if [[ ! -d "$ROOT_SSH_BKUP" ]]; then
 	echo "$0: Warning: status: $status unable create backup directory $ROOT_SSH_BKUP" 1>&2
     elif [[ "$status" -ne 0 ]]; then
@@ -309,13 +330,14 @@ if [[ ! -d "$ROOT_SSH_BKUP" || -n "$F_FLAG" ]]; then
 
 else
 
-    # restore /root/.ssh as needed
+    # perform rsync restore from bkuptree/root/.ssh to /root/.ssh
     #
+    # FYI: regarding sync args used:
     #
     #	-a		archive: clone and compare mode
     #	--delete	remove dest things not found in src
     #	-0		protect against bogus filename chars (newlines, whitespace, etc.)
-    #	-v		be verbose
+    #	-v		be verbose (if -v was given as an arg)
     #
     if [[ -n "$V_FLAG" ]]; then
 	echo "on $HOSTNAME about to restore $ETC_SSH_BKUP/ to $CHROOT/root/.ssh"
@@ -328,6 +350,9 @@ else
 	rsync -a --delete -0 --exclude 'sock-*' $V_FLAG -n "$ROOT_SSH_BKUP/" "$CHROOT/root/.ssh"
 	status=0
     fi
+
+    # rsync success or failure processing
+    #
     if [ ! -d "$CHROOT/root/.ssh" ]; then
 	echo "$0: Warning: status: $status unable to create $CHROOT/root/.ssh for $HOSTNAME from $ROOT_SSH_BKUP" 1>&2
     elif [ "$status" -ne 0 ]; then
@@ -339,7 +364,9 @@ else
 	ROOT_SSH_OK=true
     fi
 fi
-# paranoia
+#
+# paranoia - compare /root/.ssh with bkuptree/root/.ssh
+#
 if [[ -n "$ROOT_SSH_OK" ]]; then
     if [[ -n "$V_FLAG" ]]; then
 	echo diff --exclude='sock-*' -r "$CHROOT/root/.ssh" "$ROOT_SSH_BKUP"
