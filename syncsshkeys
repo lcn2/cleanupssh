@@ -30,7 +30,7 @@
 #
 BKUPTREE="/usr/global/backup/ssh/current/$HOSTNAME"
 USAGE="usage: $0 [-h] [-n] [-v] [-b bkuptree] [-r chroot] [-f] [-e] [-w whoami]
-		 [-g ssh_keys] [-c]
+		 [-g ssh_keys] [-u uid:gid] [-c]
 
 	-h		print this help message and then exit (def: don't)
 	-n		don't change any files, just echo commands (def: change)
@@ -42,7 +42,9 @@ USAGE="usage: $0 [-h] [-n] [-v] [-b bkuptree] [-r chroot] [-f] [-e] [-w whoami]
 			   (def: restore if bkuptree is a dir)
 	-e		bkuptree already must exist (def: create as needed)
 	-w whoami	use hostname: whoami (def: use $HOSTNANE)
-	-g ssh_keys	change the chgrp group (def: chgrp ssh_keys)
+	-g ssh_keys	change the chgrp group for host keys (def: chgrp ssh_keys)
+	-u uid:gid	set user/group of root .ssh keys when restoring
+			    (def: chown -R 0:0 ~root/.ssh only with restoring)
 	-c		do not chgrp system key files (def: do chgrp)
 
     NOTE: Without -f, if this bkuptree directory exists, then
@@ -101,7 +103,8 @@ CHROOT=		# effectively "/"
 F_FLAG=
 C_FLAG=
 E_FLAG=
-set -- $(/usr/bin/getopt hnvb:r:fw:g:ce $*)
+UID_GID="0:0"
+set -- $(/usr/bin/getopt hnvb:r:fw:g:u:ce $*)
 if [[ $? != 0 ]]; then
     echo "$0: FATAL: unknown or invalid -flag" 1>&2
     echo "$USAGE" 1>&2
@@ -119,6 +122,7 @@ for i in $*; do
 	BKUPTREE="/usr/global/backup/ssh/current/$2";
 	shift ;;
     -g) GROUP="$2" ; shift ;;
+    -u) UID_GID="$2" ; shift ;;
     -c) C_FLAG="-c" ;;
     -e) E_FLAG="-e" ;;
     --) shift; break ;;
@@ -131,7 +135,7 @@ if [[ $# != 0 ]]; then
 fi
 ORIG_F_FLAG="$F_FLAG"
 export N_FLAG V_FLAG BKUPTREE CHROOT F_FLAG TIMESTAMP ORIG_F_FLAG
-export GROUP C_FLAG E_FLAG
+export GROUP C_FLAG E_FLAG UID_GID
 if [[ -n "$V_FLAG" && -n "$E_FLAG" ]]; then
     if [[ -n "$F_FLAG" ]]; then
 	echo "$0: Notice: Use of -e with -f forces a BACKUP ONLY mode."
@@ -397,6 +401,13 @@ else
     elif [[ -n "$V_FLAG" ]]; then
 	echo "$0: Notice: use of -c disabled chgrp $GROUP of system key files under $CHROOT/etc/ssh" 1>&2
     fi
+
+    # report on what was restored
+    #
+    if [[ -n "$V_FLAG" ]]; then
+	echo "$0: ls -lRa $CHROOT/etc/ssh follows"
+	ls -lRa "$CHROOT/etc/ssh"
+    fi
 fi
 #
 # paranoia - compare /etc/ssh with bkuptree/etc/ssh
@@ -569,6 +580,33 @@ else
 	    echo "$0: Notice: on $HOSTNAME sucessful restore of $ROOT_SSH_BKUP to $CHROOT/root/.ssh"
 	fi
 	ROOT_SSH_OK=true
+    fi
+
+    # chown all of the restored files and anything else in the ~root/.ssh directory tree
+    #
+    if [[ -n "$ROOT_SSH_OK" ]]; then
+	if [[ -n "$V_FLAG" ]]; then
+	    echo chown -R "$UID_GID" "$CHROOT/root/.ssh"
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    chown -R "$UID_GID" "$CHROOT/root/.ssh"
+	    status="$?"
+	else
+	    status=0
+	fi
+	if [ "$status" -ne 0 ]; then
+	    echo "$0: Warning: chown $UID_GID $CHROOT/root/.ssh failed, status: $status" 1>&2
+	    ROOT_SSH_OK=
+	fi
+    else
+	echo "$0: Warning: disable chown $UID_GID $CHROOT/root/.ssh due to previous rsync failure " 1>&2
+    fi
+
+    # report on what was restored
+    #
+    if [[ -n "$V_FLAG" ]]; then
+	echo "$0: ls -lRa $CHROOT/root/.ssh follows"
+	ls -lRa "$CHROOT/root/.ssh"
     fi
 fi
 #
