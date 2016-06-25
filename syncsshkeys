@@ -104,35 +104,41 @@ F_FLAG=
 C_FLAG=
 E_FLAG=
 UID_GID="0:0"
-set -- $(/usr/bin/getopt hnvb:r:fw:g:u:ce $*)
-if [[ $? != 0 ]]; then
-    echo "$0: FATAL: unknown or invalid -flag" 1>&2
-    echo "$USAGE" 1>&2
-    exit 3
-fi
-for i in $*; do
-    case $i in
-    -h) echo "$USAGE" 1>&2; exit 0 ;;
-    -n) N_FLAG="-n" ;;
-    -v) V_FLAG="-v" ;;
-    -b) BKUPTREE="$2" ; shift ;;
-    -r) CHROOT="$2" ; shift ;;
-    -f) F_FLAG="-f" ;;
-    -w) HOSTNAME="$2";
-	BKUPTREE="/usr/global/backup/ssh/current/$2";
-	shift ;;
-    -g) GROUP="$2" ; shift ;;
-    -u) UID_GID="$2" ; shift ;;
-    -c) C_FLAG="-c" ;;
-    -e) E_FLAG="-e" ;;
-    --) shift; break ;;
+while getopts hnvb:r:fw:g:u:ce flag; do
+    case "$flag" in
+    h) echo "$USAGE" 1>&2; exit 0 ;;
+    n) N_FLAG="-n" ;;
+    v) V_FLAG="-v" ;;
+    b) BKUPTREE="$OPTARG" ;
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "$0: Notice: \$BKUPTREE: $BKUPTREE"
+	fi ;;
+    r) CHROOT="$OPTARG" ;
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "$0: Notice: \$CHROOT: $CHROOT"
+	fi ;;
+    f) F_FLAG="-f" ;;
+    w) HOSTNAME="$OPTARG";
+	BKUPTREE="/usr/global/backup/ssh/current/$OPTARG";
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "$0: Notice: \$HOSTNAME: $HOSTNAME"
+	    echo "$0: Notice: \$BKUPTREE: $BKUPTREE"
+	fi ;;
+    g) GROUP="$OPTARG" ;
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "$0: Notice: \$GROUP: $GROUP"
+	fi ;;
+    u) UID_GID="$OPTARG" ;
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "$0: Notice: \$UID_GID: $UID_GID"
+	fi ;;
+    c) C_FLAG="-c" ;;
+    e) E_FLAG="-e" ;;
+    ?) echo "$0: FATAL: unknown or invalid -flag" 1>&2 ;
+       echo "$USAGE" 1>&2 ;
+       exit 3 ;;
     esac
-    shift
 done
-if [[ $# != 0 ]]; then
-    echo "$USAGE" 1>&2
-    exit 4
-fi
 ORIG_F_FLAG="$F_FLAG"
 export N_FLAG V_FLAG BKUPTREE CHROOT F_FLAG TIMESTAMP ORIG_F_FLAG
 export GROUP C_FLAG E_FLAG UID_GID
