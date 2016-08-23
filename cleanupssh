@@ -1,0 +1,200 @@
+#!/bin/bash
+#
+# cleanupssh - cleanup a .ssh directory
+#
+# Copyright (c) 2015 by Landon Curt Noll.  All Rights Reserved.
+#
+# Permission to use, copy, modify, and distribute this software and
+# its documentation for any purpose and without fee is hereby granted,
+# provided that the above copyright, this permission notice and text
+# this comment, and the disclaimer below appear in all of the following:
+#
+#       supporting documentation
+#       source copies
+#       source works derived from this source
+#       binaries derived from this source or from derived source
+#
+# LANDON CURT NOLL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO
+# EVENT SHALL LANDON CURT NOLL BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF
+# USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+# OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+# PERFORMANCE OF THIS SOFTWARE.
+#
+# chongo (Landon Curt Noll, http://www.isthe.com/chongo/index.html) /\oo/\
+#
+# Share and enjoy! :-)
+
+# parse args
+#
+export USAGE="usage: $0 [-n] [-v] dir
+
+    -n		do nothing (def: do)
+    -v		verbose mode (def: quiet)
+    -f		force cleanup if authorized_keys is missing
+    -h		print this message and exit
+
+    dir		.ssh directory to clean up"
+export N_FLAG=
+export V_FLAG=
+export F_FLAG=
+while getopts hnvf flag; do
+    case "$flag" in
+    h) echo "$USAGE" 1>&2; exit 0 ;;
+    n) N_FLAG="-n" ;;
+    v) V_FLAG="-v" ;;
+    f) F_FLAG="-f" ;;
+    ?) echo "$0: FATAL: unknown or invalid -flag" 1>&2 ;
+       echo "$USAGE" 1>&2 ;
+       exit 1 ;;
+    esac
+done
+shift $(( OPTIND - 1 ));
+if [[ $# -ne 1 ]]; then
+   echo "$USAGE" 1>&2 ;
+   exit 2
+fi
+export dir="$1"
+
+# firewall
+#
+if [[ ! -d "$dir" ]]; then
+    if [[ -z "$F_FLAG" ]]; then
+	echo "$0: FATAL: not a directory: $dir" 1>&2
+	exit 3
+    else
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "mkdir -p $dir"
+	fi
+	mkdir -p "$dir"
+	if [[ ! -d "$dir" ]]; then
+	    echo "$0: FATAL: cannot make directory: $dir" 1>&2
+	    exit 4
+	fi
+    fi
+fi
+if [[ -z "$N_FLAG" && ! -w "$dir" ]]; then
+    echo "$0: FATAL: directory not writable: $dir" 1>&2
+    exit 5
+fi
+if [[ -n "$V_FLAG" ]]; then
+    echo "cd $dir"
+fi
+cd "$dir"
+status="$?"
+if [[ $status -ne 0 ]]; then
+    echo "$0: FATAL: cd $dir, error code: $status" 1>&2
+    exit 6
+fi
+if [[ -z "$F_FLAG" && ! -f authorized_keys ]]; then
+    echo "$0: FATAL: $dir is missing authorized_keys" 1>&2
+    exit 7
+fi
+if [[ -z "$F_FLAG" && ! -f id_rsa ]]; then
+    echo "$0: FATAL: $dir is missing id_rsa" 1>&2
+    exit 8
+fi
+if [[ -z "$F_FLAG" && ! -f id_rsa.pub ]]; then
+    echo "$0: FATAL: $dir is missing id_rsa.pub" 1>&2
+    exit 9
+fi
+
+# form missing critical directories
+#
+if [[ ! -d sock ]]; then
+    if [[ -z "$N_FLAG" ]]; then
+	mkdir $V_FLAG sock
+	status="$?"
+	if [[ ! -d sock ]]; then
+	    echo "$0: FATAL cannot mkdir sock, error code: $status" 1>&2
+	    exit 10
+	fi
+    elif [[ -n "$V_FLAG" ]]; then
+	echo mkdir $V_FLAG sock
+    fi
+fi
+if [[ -z "$N_FLAG" ]]; then
+    chmod $V_FLAG 0700 sock
+    status="$?"
+    if [[ $status -ne 0 ]]; then
+	echo "$0: FATAL: chmod 0700 sock, error code: $status" 1>&2
+	exit 11
+    fi
+elif [[ -n "$V_FLAG" ]]; then
+    echo chmod $V_FLAG 0700 sock
+fi
+if [[ -z "$N_FLAG" && ! -w sock ]]; then
+    echo "$0: FATAL: directory not writable: sock" 1>&2
+    exit 12
+fi
+if [[ ! -d OLD ]]; then
+    if [[ -z "$N_FLAG" ]]; then
+	mkdir $V_FLAG OLD
+	status="$?"
+	if [[ ! -d OLD ]]; then
+	    echo "$0: FATAL cannot mkdir OLD, error code: $status" 1>&2
+	    exit 13
+	fi
+    elif [[ -n "$V_FLAG" ]]; then
+	echo mkdir $V_FLAG OLD
+    fi
+fi
+if [[ -z "$N_FLAG" ]]; then
+    chmod $V_FLAG 0700 OLD
+    status="$?"
+    if [[ $status -ne 0 ]]; then
+	echo "$0: FATAL: chmod 0700 OLD, error code: $status" 1>&2
+	exit 14
+    fi
+elif [[ -n "$V_FLAG" ]]; then
+    echo chmod $V_FLAG 0700 OLD
+fi
+if [[ -z "$N_FLAG" && ! -w OLD ]]; then
+    echo "$0: FATAL: directory not writable: OLD" 1>&2
+    exit 15
+fi
+
+# set file permissions
+#
+if [[ -z "$N_FLAG" ]]; then
+    chmod $V_FLAG 0700 .
+    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 | xargs -0 chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 | xargs -0 chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 | xargs -0 chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 | xargs -0 chmod $V_FLAG 0444
+    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 | xargs -0 chmod $V_FLAG 0664
+elif [[ -n "$V_FLAG" ]]; then
+    echo chmod $V_FLAG 0700 .
+    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 | xargs -0 echo chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 | xargs -0 echo chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 | xargs -0 echo chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 | xargs -0 echo chmod $V_FLAG 0444
+    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 | xargs -0 echo chmod $V_FLAG 0664
+fi
+
+# move all but the last dated element of certain files into OLD
+#
+for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
+    if [[ -f "$file" ]]; then
+	if [[ $file = id_rsa ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name "$file"'.*'
+	else
+	    find . -mindepth 1 -maxdepth 1 -type f -name "$file"'.*'
+	fi | sort | head --lines=-1 | while read i; do
+	    if [[ -z "$N_FLAG" ]]; then
+		mv $V_FLAG "$i" OLD
+		status="$?"
+		if [[ $status -ne 0 ]]; then
+		    echo "$0: Warning: mv $V_FLAG $i OLD, error code: $status" 1>&2
+		fi
+	    elif [[ -n "$V_FLAG" ]]; then
+		echo mv $V_FLAG "$i" OLD
+	    fi
+    	done
+    fi
+done
+
+# All Done!!! - Jessica Noll, Age 2
+#
+exit 0
