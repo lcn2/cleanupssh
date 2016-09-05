@@ -167,27 +167,27 @@ fi
 if [[ -z "$N_FLAG" ]]; then
     chmod $V_FLAG 0700 .
     find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
-      xargs $XARGS_V -0 chmod 0400
+      xargs $XARGS_V -0 chmod $V_FLAG 0400
     find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
-      xargs $XARGS_V -0 chmod 0400
+      xargs $XARGS_V -0 chmod $V_FLAG 0400
     find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
-      xargs $XARGS_V -0 chmod 0400
+      xargs $XARGS_V -0 chmod $V_FLAG 0400
     find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
-      xargs $XARGS_V -0 chmod 0444
+      xargs $XARGS_V -0 chmod $V_FLAG 0444
     find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
-      xargs $XARGS_V -0 chmod 0664
+      xargs $XARGS_V -0 chmod $V_FLAG 0664
 elif [[ -n "$V_FLAG" ]]; then
     echo chmod $V_FLAG 0700 .
     find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
-      xargs -0 echo chmod 0400
+      xargs -0 echo chmod $V_FLAG 0400
     find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
-      xargs -0 echo chmod 0400
+      xargs -0 echo chmod $V_FLAG 0400
     find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
-      xargs -0 echo chmod 0400
+      xargs -0 echo chmod $V_FLAG 0400
     find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
-      xargs -0 echo chmod 0444
+      xargs -0 echo chmod $V_FLAG 0444
     find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
-      xargs -0 echo chmod 0664
+      xargs -0 echo chmod $V_FLAG 0664
 fi
 
 # move all but the last dated element of certain files into OLD
