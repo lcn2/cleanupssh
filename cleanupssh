@@ -159,34 +159,45 @@ fi
 #
 if [[ -z "$N_FLAG" ]]; then
     chmod $V_FLAG 0700 .
-    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 | xargs -0 chmod $V_FLAG 0400
-    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 | xargs -0 chmod $V_FLAG 0400
-    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 | xargs -0 chmod $V_FLAG 0400
-    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 | xargs -0 chmod $V_FLAG 0444
-    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 | xargs -0 chmod $V_FLAG 0664
+    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+      xargs -0 chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+      xargs -0 chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+      xargs -0 chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+      xargs -0 chmod $V_FLAG 0444
+    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+      xargs -0 chmod $V_FLAG 0664
 elif [[ -n "$V_FLAG" ]]; then
     echo chmod $V_FLAG 0700 .
-    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 | xargs -0 echo chmod $V_FLAG 0400
-    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 | xargs -0 echo chmod $V_FLAG 0400
-    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 | xargs -0 echo chmod $V_FLAG 0400
-    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 | xargs -0 echo chmod $V_FLAG 0444
-    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 | xargs -0 echo chmod $V_FLAG 0664
+    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+      xargs -0 echo chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+      xargs -0 echo chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+      xargs -0 echo chmod $V_FLAG 0400
+    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+      xargs -0 echo chmod $V_FLAG 0444
+    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+      xargs -0 echo chmod $V_FLAG 0664
 fi
 
 # move all but the last dated element of certain files into OLD
 #
-for file in authorized_keys config.sonic.chongo config.arcetri.chongo config.arcetri.root \
-  config.main.chongo config id_rsa id_rsa.pub known_hosts; do
+for file in authorized_keys config.sonic.chongo config.arcetri.non-root \
+  config.arcetri.root config.arcetri.chongo config.isthe.chongo config \
+  id_rsa id_rsa.pub known_hosts; do
     echo $file
     if [[ -f "$file" ]]; then
 	if [[ $file = id_rsa ]]; then
 	    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' \( \
-	        -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]' -o \
-	        -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][a-z]' \)
+	      -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]' -o \
+	      -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][a-z]' \)
 	else
 	    find . -mindepth 1 -maxdepth 1 -type f \( \
-	    	-name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]' -o \
-	    	-name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][a-z]' \)
+	      -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]' -o \
+	      -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][a-z]' \)
 	fi | sort | awk 'NR != 1 {print $0;}' | while read i; do
 	    if [[ -z "$N_FLAG" ]]; then
 		mv $V_FLAG "$i" OLD
