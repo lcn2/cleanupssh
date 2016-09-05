@@ -102,6 +102,9 @@ fi
 
 # form missing critical directories
 #
+if [[ -n "$V_FLAG" ]]; then
+    echo '# processing critical directories'
+fi
 if [[ ! -d sock ]]; then
     if [[ -z "$N_FLAG" ]]; then
 	mkdir $V_FLAG sock
@@ -157,6 +160,9 @@ fi
 
 # set file permissions
 #
+if [[ -n "$V_FLAG" ]]; then
+    echo '# processing fileset permissions'
+fi
 if [[ -z "$N_FLAG" ]]; then
     chmod $V_FLAG 0700 .
     find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
@@ -188,28 +194,23 @@ fi
 for file in authorized_keys config.sonic.chongo config.arcetri.non-root \
   config.arcetri.root config.arcetri.chongo config.isthe.chongo config \
   id_rsa id_rsa.pub known_hosts; do
-    echo $file
-    if [[ -f "$file" ]]; then
-	if [[ $file = id_rsa ]]; then
-	    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' \( \
-	      -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]' -o \
-	      -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][a-z]' \)
-	else
-	    find . -mindepth 1 -maxdepth 1 -type f \( \
-	      -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]' -o \
-	      -name "$file"'*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][a-z]' \)
-	fi | sort | awk 'NR != 1 {print $0;}' | while read i; do
-	    if [[ -z "$N_FLAG" ]]; then
-		mv $V_FLAG "$i" OLD
-		status="$?"
-		if [[ $status -ne 0 ]]; then
-		    echo "$0: Warning: mv $V_FLAG $i OLD, error code: $status" 1>&2
-		fi
-	    elif [[ -n "$V_FLAG" ]]; then
-		echo mv $V_FLAG "$i" OLD
-	    fi
-    	done
+    if [[ -n "$V_FLAG" ]]; then
+	echo "# processing fileset: $file"
     fi
+    find . -mindepth 1 -maxdepth 1 -type f \( \
+      -name "$file"'.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]' -o \
+      -name "$file"'.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][a-z]' \) |
+      sort -r | awk 'NR != 1 {print $0;}' | while read i; do
+    if [[ -z "$N_FLAG" ]]; then
+	mv $V_FLAG "$i" OLD
+	status="$?"
+	if [[ $status -ne 0 ]]; then
+	    echo "$0: Warning: mv $V_FLAG $i OLD, error code: $status" 1>&2
+	fi
+    elif [[ -n "$V_FLAG" ]]; then
+	echo mv $V_FLAG "$i" OLD
+    fi
+    done
 done
 
 # All Done!!! - Jessica Noll, Age 2
