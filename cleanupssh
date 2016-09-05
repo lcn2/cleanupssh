@@ -191,8 +191,8 @@ fi
 
 # move all but the last dated element of certain files into OLD
 #
-for file in authorized_keys config.sonic.chongo config.arcetri.non-root \
-  config.arcetri.root config.arcetri.chongo config.isthe.chongo config \
+for file in authorized_keys config.sonic.any config.arcetri.non-root \
+  config.arcetri.root config.arcetri.chongo config.isthe.any config \
   id_rsa id_rsa.pub known_hosts; do
     if [[ -n "$V_FLAG" ]]; then
 	echo "# processing fileset: $file"
