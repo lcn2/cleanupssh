@@ -268,6 +268,10 @@ find . -mindepth 1 -maxdepth 1 -type f \( -name 'from-*' -o -name 'no-*' \) -pri
     fi
     done
 
+# clean up .nfs files in sock that are older than 1 day
+#
+find sock -name '.nfs*' -mtime +1 -type s -print0 | xargs -0 -r rm -f
+
 # All Done!!! - Jessica Noll, Age 2
 #
 exit 0
