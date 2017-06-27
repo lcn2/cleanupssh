@@ -57,6 +57,9 @@ if [[ $# -ne 1 ]]; then
    exit 2
 fi
 export dir="$1"
+if [[ -z "${OS}" ]]; then
+    export OS=$(uname | tr '[A-Z]' '[a-z]')
+fi
 
 # firewall
 #
