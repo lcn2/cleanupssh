@@ -256,7 +256,14 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
     # catch the case of a missing critical file
     #
     if [[ ! -f "$file" ]]; then
-	echo "$0: Warning: $dir is missing $file" 1>&2
+	case "$file" in
+	authorized_keys|config|known_hosts)
+	    echo "$0: Notice: not a critical problem, but $dir does not have file: $file" 1>&2
+	    ;;
+	*)
+	    echo "$0: Warning: $dir is missing important file: $file" 1>&2
+	    ;;
+	esac
 	continue
     fi
 
