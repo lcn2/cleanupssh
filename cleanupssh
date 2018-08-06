@@ -2,7 +2,7 @@
 #
 # cleanupssh - cleanup a .ssh directory
 #
-# Copyright (c) 2015-2017 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2015-2018 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
@@ -28,24 +28,34 @@
 
 # parse args
 #
-export USAGE="usage: $0 [-n] [-v] dir
+export VERSION="2.0"
+export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-V] [-h] dir
 
     -n		do nothing (def: do)
     -v		verbose mode (def: quiet)
-    -f		force cleanup if authorized_keys, id_rsa or id_rsa.pub is missing
+    -f		force cleanup if missing: authorized_keys config id_rsa id_rsa.pub known_hosts
+    -i		do not warn if missing:   authorized_keys config id_rsa id_rsa.pub known_hosts
+		    NOTE: -i implies -f
+
+    -V		print version and exit
     -h		print this message and exit
 
-    dir		.ssh directory to clean up"
+    dir		.ssh directory to clean up
+
+    Version: $VERSION"
 export N_FLAG=
 export V_FLAG=
 export XARGS_V=
 export F_FLAG=
-while getopts hnvf flag; do
+export I_FLAG=
+while getopts hnvfiV flag; do
     case "$flag" in
     h) echo "$USAGE" 1>&2; exit 0 ;;
     n) N_FLAG="-n" ;;
     v) V_FLAG="-v" ; XARGS_V="-t" ;;
     f) F_FLAG="-f" ;;
+    i) I_FLAG="-i"; F_FLAG="-f" ;;
+    V) echo "$0: Version: $VERSION" ; exit 0 ;;
     ?) echo "$0: FATAL: unknown or invalid -flag" 1>&2 ;
        echo "$USAGE" 1>&2 ;
        exit 1 ;;
@@ -258,10 +268,13 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
     if [[ ! -f "$file" ]]; then
 	case "$file" in
 	authorized_keys|config|known_hosts)
-	    echo "$0: Notice: not a critical problem, but $dir does not have file: $file" 1>&2
+	    if [[ -z "$I_FLAG" ]]; then
+		echo "$0: Notice: not a critical problem, but $dir does not have file: $file" 1>&2
+	    fi
 	    ;;
-	*)
-	    echo "$0: Warning: $dir is missing important file: $file" 1>&2
+	*)  if [[ -z "$I_FLAG" ]]; then
+		echo "$0: Warning: $dir is missing important file: $file" 1>&2
+	    fi
 	    ;;
 	esac
 	continue
@@ -301,6 +314,12 @@ done
 # move all but the last dated element of certain files into OLD
 #
 for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
+    if [[ ! -f "$file" && -n "$I_FLAG" ]]; then
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "# skipping the processing of: $file"
+	fi
+	continue
+    fi
     if [[ -n "$V_FLAG" ]]; then
 	echo "# processing fileset: $file"
     fi
