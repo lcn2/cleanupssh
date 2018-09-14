@@ -10,6 +10,8 @@ INSTALL= install
 
 DESTDIR= /usr/global/sbin
 SPECIAL_TOOLDIR= ~chongo/dot/tool
+SPECIAL_TOOLDIR_USER= chongo
+SPECIAL_TOOLDIR_GROUP= chongo
 
 TARGETS= cleanupssh
 
@@ -24,6 +26,6 @@ clobber quick_clobber: clean
 install: all
 	${INSTALL} -m 0555 cleanupssh ${DESTDIR}
 	@-if [[ -d ${SPECIAL_TOOLDIR} ]]; then \
-	    echo ${INSTALL} -m 0555 cleanupssh ${SPECIAL_TOOLDIR}; \
-	    ${INSTALL} -m 0555 cleanupssh ${SPECIAL_TOOLDIR}; \
+	    echo ${INSTALL} -m 0555 -o ${SPECIAL_TOOLDIR_USER} -g ${SPECIAL_TOOLDIR_GROUP} cleanupssh ${SPECIAL_TOOLDIR}; \
+	    ${INSTALL} -m 0555 -o ${SPECIAL_TOOLDIR_USER} -g ${SPECIAL_TOOLDIR_GROUP} cleanupssh ${SPECIAL_TOOLDIR}; \
 	fi
