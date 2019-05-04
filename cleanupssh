@@ -28,7 +28,7 @@
 
 # parse args
 #
-export VERSION="3.0"
+export VERSION="3.1"
 export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-s] [-c user[:group]] [-V] [-h] dir
 
     -n		Do nothing (def: do)
@@ -271,7 +271,7 @@ if [[ -z $S_FLAG ]]; then
 		echo chown "$V_FLAG" "$USER_GROUP" "$SORTED_TMP"
 	    fi
 	    if [[ -z "$N_FLAG" ]]; then
-		chown "$V_FLAG" "$USER_GROUP" "$SORTED_TMP"
+		chown $V_FLAG "$USER_GROUP" "$SORTED_TMP"
 		status="$?"
 	    else
 		status=0
@@ -285,7 +285,7 @@ if [[ -z $S_FLAG ]]; then
 	    echo chmod "$V_FLAG" 0400 "$SORTED_TMP"
 	fi
 	if [[ -z "$N_FLAG" ]]; then
-	    chmod "$V_FLAG" 0400 "$SORTED_TMP"
+	    chmod $V_FLAG 0400 "$SORTED_TMP"
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
 		echo "$0: FATAL: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
@@ -296,7 +296,7 @@ if [[ -z $S_FLAG ]]; then
 	    echo mv -f "$V_FLAG" "$SORTED_TMP" authorized_keys
 	fi
 	if [[ -z "$N_FLAG" ]]; then
-	    mv -f "$V_FLAG" "$SORTED_TMP" authorized_keys
+	    mv -f $V_FLAG "$SORTED_TMP" authorized_keys
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
 		echo "$0: FATAL: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
@@ -486,7 +486,7 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
 	    echo "cp -p $V_FLAG $file $date_file"
 	fi
 	if [[ -z "$N_FLAG" ]]; then
-	    cp -p "$V_FLAG" "$file" "$date_file"
+	    cp -p $V_FLAG "$file" "$date_file"
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
 		echo "$0: FATAL: cp -p $V_FLAG $file $date_file, error code: $status" 1>&2
