@@ -2,7 +2,7 @@
 #
 # cleanupssh - cleanup a .ssh directory
 #
-# Copyright (c) 2015-2018 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2015-2019 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
@@ -28,19 +28,23 @@
 
 # parse args
 #
-export VERSION="2.0"
-export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-V] [-h] dir
+export VERSION="3.0"
+export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-s] [-c user[:group]] [-V] [-h] dir
 
-    -n		do nothing (def: do)
-    -v		verbose mode (def: quiet)
-    -f		force cleanup if missing: authorized_keys config id_rsa id_rsa.pub known_hosts
-    -i		do not warn if missing:   authorized_keys config id_rsa id_rsa.pub known_hosts
+    -n		Do nothing (def: do)
+    -v		Verbose mode (def: quiet)
+    -f		Force cleanup if missing: authorized_keys config id_rsa id_rsa.pub known_hosts
+    -i		Do not warn if missing:   authorized_keys config id_rsa id_rsa.pub known_hosts
 		    NOTE: -i implies -f
+    -s		Do not unique sort authorized_keys (def: do)
 
-    -V		print version and exit
-    -h		print this message and exit
+    -c user[:group]	Chown critical files as user:group (def: do not chown)
+			    NOTE: Ignored if UID != 0 (i.e., not root)
 
-    dir		.ssh directory to clean up
+    -V		Print version and exit
+    -h		Print this mdssage and exit
+
+    dir		The .ssh directory to clean up
 
     Version: $VERSION"
 export N_FLAG=
@@ -48,13 +52,17 @@ export V_FLAG=
 export XARGS_V=
 export F_FLAG=
 export I_FLAG=
-while getopts hnvfiV flag; do
+export S_FLAG=
+export USER_GROUP=
+while getopts hnvfisc:V flag; do
     case "$flag" in
     h) echo "$USAGE" 1>&2; exit 0 ;;
     n) N_FLAG="-n" ;;
     v) V_FLAG="-v" ; XARGS_V="-t" ;;
     f) F_FLAG="-f" ;;
     i) I_FLAG="-i"; F_FLAG="-f" ;;
+    s) S_FLAG="-s" ;;
+    c) USER_GROUP="$OPTARG" ;;
     V) echo "$0: Version: $VERSION" ; exit 0 ;;
     ?) echo "$0: FATAL: unknown or invalid -flag" 1>&2 ;
        echo "$USAGE" 1>&2 ;
@@ -70,18 +78,32 @@ export dir="$1"
 if [[ -z "${OS}" ]]; then
     export OS=$(uname | tr '[A-Z]' '[a-z]')
 fi
+if [[ -n $USER_GROUP ]]; then
+    if [[ -z $UID ]]; then
+	export UID="$(/usr/bin/id -u)"
+    fi
+    if [[ $UID -ne 0 ]]; then
+	if [[ -z $I_FLAG ]]; then
+	    echo "$0: Warning: because UID: $UID != 0, ignoring: -c $USER_GROUP" 1>&2
+	fi
+	USER_GROUP=
+    fi
+fi
 
 # firewall
 #
+if [[ -n "$V_FLAG" ]]; then
+    echo '# Move into the directory'
+fi
 if [[ ! -d "$dir" ]]; then
     if [[ -z "$F_FLAG" ]]; then
 	echo "$0: FATAL: not a directory: $dir" 1>&2
 	exit 3
     else
 	if [[ -n "$V_FLAG" ]]; then
-	    echo "mkdir -p $dir"
+	    echo "mkdir -p --mode=0700 $dir"
 	fi
-	mkdir -p "$dir"
+	mkdir -p --mode=0700 "$dir"
 	if [[ ! -d "$dir" ]]; then
 	    echo "$0: FATAL: cannot make directory: $dir" 1>&2
 	    exit 4
@@ -113,11 +135,14 @@ if [[ -z "$F_FLAG" && ! -f id_rsa.pub ]]; then
     echo "$0: FATAL: $dir is missing id_rsa.pub" 1>&2
     exit 9
 fi
+if [[ -n "$V_FLAG" ]]; then
+    echo
+fi
 
 # form missing critical directories
 #
 if [[ -n "$V_FLAG" ]]; then
-    echo '# processing critical directories'
+    echo '# Processing critical directories'
 fi
 if [[ ! -d sock ]]; then
     if [[ -z "$N_FLAG" ]]; then
@@ -140,7 +165,7 @@ if [[ -z "$N_FLAG" ]]; then
     fi
 elif [[ -n "$V_FLAG" ]]; then
     echo chmod $V_FLAG 0700 sock
-fi
+fi 2>&1 | grep -v ' retained as '
 if [[ -z "$N_FLAG" && ! -w sock ]]; then
     echo "$0: FATAL: directory not writable: sock" 1>&2
     exit 12
@@ -166,7 +191,7 @@ if [[ -z "$N_FLAG" ]]; then
     fi
 elif [[ -n "$V_FLAG" ]]; then
     echo chmod $V_FLAG 0700 OLD
-fi
+fi 2>&1 | grep -v ' retained as '
 if [[ -z "$N_FLAG" && ! -w OLD ]]; then
     echo "$0: FATAL: directory not writable: OLD" 1>&2
     exit 15
@@ -192,16 +217,106 @@ if [[ -z "$N_FLAG" ]]; then
     fi
 elif [[ -n "$V_FLAG" ]]; then
     echo chmod $V_FLAG 0700 from
-fi
+fi 2>&1 | grep -v ' retained as '
 if [[ -z "$N_FLAG" && ! -w from ]]; then
     echo "$0: FATAL: directory not writable: from" 1>&2
     exit 18
+fi
+if [[ -n "$V_FLAG" ]]; then
+    echo
+fi
+
+# unless -s, be sure that authorized_keys is in canonical order
+#
+if [[ -z $S_FLAG ]]; then
+    if [[ -n "$V_FLAG" ]]; then
+	echo '# Canonical order processing on authorized_keys'
+    fi
+    #
+    export SORTED_TMP=
+    if [[ -z "$N_FLAG" ]]; then
+	SORTED_TMP=$(mktemp sorted-authorized_keys.XXXXXX)
+	if [[ -z $SORTED_TMP || ! -w $SORTED_TMP ]]; then
+	    echo "$0: FATAL: cannot create a temporary writable file" 1>&2
+	    exit 19
+	fi
+	trap 'rm -f -- "$SORTED_TMP"' 0 1 2 3 15
+    else
+	SORTED_TMP=$(mktemp -u sorted-authorized_keys.XXXXXX)
+    fi
+    if [[ -n "$V_FLAG" ]]; then
+	echo sort -u -k3 authorized_keys -o "$SORTED_TMP"
+    fi
+    if [[ -z "$N_FLAG" ]]; then
+	sort -u -k3 authorized_keys -o "$SORTED_TMP"
+	status="$?"
+    else
+	status=0
+    fi
+    if [[ $status -ne 0 ]]; then
+	echo "$0: FATAL: sort -u -k3 authorized_keys -o $SORTED_TMP, error code: $status" 1>&2
+	exit 20
+    fi
+    #
+    if cmp -s authorized_keys "$SORTED_TMP"; then
+	if [[ -n "$V_FLAG" ]]; then
+	    echo rm -f "$SORTED_TMP"
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    rm -f "$SORTED_TMP"
+	fi
+    else
+	if [[ -n "$USER_GROUP" ]]; then
+	    if [[ -n "$V_FLAG" ]]; then
+		echo chown "$V_FLAG" "$USER_GROUP" "$SORTED_TMP"
+	    fi
+	    if [[ -z "$N_FLAG" ]]; then
+		chown "$V_FLAG" "$USER_GROUP" "$SORTED_TMP"
+		status="$?"
+	    else
+		status=0
+	    fi 2>&1 | grep -v ' retained as '
+	    if [[ $status -ne 0 ]]; then
+		echo "$0: FATAL: chown $USER_GROUP $SORTED_TMP, error code: $status" 1>&2
+		exit 21
+	    fi
+	fi
+	if [[ -n "$V_FLAG" ]]; then
+	    echo chmod "$V_FLAG" 0400 "$SORTED_TMP"
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    chmod "$V_FLAG" 0400 "$SORTED_TMP"
+	    status="$?"
+	    if [[ $status -ne 0 ]]; then
+		echo "$0: FATAL: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
+		exit 22
+	    fi
+	fi 2>&1 | grep -v ' retained as '
+	if [[ -n "$V_FLAG" ]]; then
+	    echo mv -f "$V_FLAG" "$SORTED_TMP" authorized_keys
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    mv -f "$V_FLAG" "$SORTED_TMP" authorized_keys
+	    status="$?"
+	    if [[ $status -ne 0 ]]; then
+		echo "$0: FATAL: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
+		exit 23
+	    fi
+	fi
+    fi
+else
+    if [[ -n "$V_FLAG" ]]; then
+	echo '# Disabled canonical order check on canonical order due to -s flag'
+    fi
+fi
+if [[ -n "$V_FLAG" ]]; then
+    echo
 fi
 
 # set file permissions
 #
 if [[ -n "$V_FLAG" ]]; then
-    echo '# processing fileset permissions'
+    echo '# Processing fileset permissions'
 fi
 if [[ -z "$N_FLAG" ]]; then
     chmod $V_FLAG 0700 .
@@ -257,10 +372,82 @@ elif [[ -n "$V_FLAG" ]]; then
 	find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
 	  xargs -0 echo chmod $V_FLAG 0664
     fi
+fi 2>&1 | grep -v ' retained as '
+if [[ -n "$V_FLAG" ]]; then
+    echo
 fi
 
-# Insure that critical files have a dated copy
+# set file ownership
 #
+if [[ -n "$USER_GROUP" ]]; then
+    if [[ -n "$V_FLAG" ]]; then
+	echo '# Processing fileset ownerships'
+    fi
+    if [[ -z "$N_FLAG" ]]; then
+	chown $V_FLAG "$USER_GROUP" .
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+	      xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
+	fi
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+	      xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
+	fi
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+	      xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
+	fi
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+	      xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
+	fi
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+	      xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
+	fi
+    elif [[ -n "$V_FLAG" ]]; then
+	echo chown $V_FLAG "$USER_GROUP" .
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+	      xargs -0 echo chown $V_FLAG "$USER_GROUP"
+	fi
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+	      xargs -0 echo chown $V_FLAG "$USER_GROUP"
+	fi
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+	      xargs -0 echo chown $V_FLAG "$USER_GROUP"
+	fi
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+	      xargs -0 echo chown $V_FLAG "$USER_GROUP"
+	fi
+	SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print)
+	if [[ -n $SET ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+	      xargs -0 echo chown $V_FLAG "$USER_GROUP"
+	fi
+    fi 2>&1 | grep -v ' retained as '
+    if [[ -n "$V_FLAG" ]]; then
+	echo
+    fi
+fi
+
+# Ensure that critical files have a dated copy
+#
+if [[ -n "$V_FLAG" ]]; then
+    echo '# Ensure that critical files have a dated copy'
+fi
 for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
 
     # catch the case of a missing critical file
@@ -284,44 +471,45 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
     #
     if [[ "${OS}" == "darwin" || "${OS}" == "macOS" ]]; then
 	date_file="$file."$(ls -Tl "$file" | awk '{if($6~"Jan"){m="01"}else if($6~"Feb"){m="02"}else if($6~"Mar"){m="03"}else if($6~"Apr"){m="04"}else if($6~"May"){m="05"}else if($6~"Jun"){m="06"}else if($6~"Jul"){m="07"}else if($6~"Aug"){m="08"}else if($6~"Sep"){m="09"}else if($6~"Oct"){m="10"}else if($6~"Nov"){m="11"}else if($6~"Dec"){m="12"} else{m="mm"} if($7 < 10) {d="0"$7;} else {d=$7;} print $9 m d "." $8}' | tr -d :)
-    elif [[ "${HOSTNAME}" == "bolt.sonic.net" ]]; then
-	date_file="$file."$(ls --full-time "$file" | awk '{if($7~"Jan"){m="01"}else if($7~"Feb"){m="02"}else if($7~"Mar"){m="03"}else if($7~"Apr"){m="04"}else if($7~"May"){m="05"}else if($7~"Jun"){m="06"}else if($7~"Jul"){m="07"}else if($7~"Aug"){m="08"}else if($7~"Sep"){m="09"}else if($7~"Oct"){m="10"}else if($7~"Nov"){m="11"}else if($7~"Dec"){m="12"} else{m="mm"} if($8 < 10) {d="0"$8;} else {d=$8;} print $10 m d "." $9}' | tr -d :)
     else
 	date_file="$file."$(ls --full-time "$file" | awk '{print $6, $7;}' | sed -e 's/\.[0-9]*$//' -e 's/[:-]//g' -e 's/ /./')
     fi
     if [[ -z $date_file ]]; then
 	echo "$0: FATAL: cannot determinte date for file: $file" 1>&2
-	exit 19
+	exit 24
     fi
 
     # unless the timestamped file is a copy of the original, form it
     #
     if ! cmp -s "$file" "$date_file"; then
 	if [[ -n "$V_FLAG" ]]; then
-	    echo "cp -p $file $date_file"
+	    echo "cp -p $V_FLAG $file $date_file"
 	fi
 	if [[ -z "$N_FLAG" ]]; then
-	    cp -p "$file" "$date_file"
+	    cp -p "$V_FLAG" "$file" "$date_file"
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
-		echo "$0: FATAL: cp -p $file $date_file, error code: $status" 1>&2
-		exit 20
+		echo "$0: FATAL: cp -p $V_FLAG $file $date_file, error code: $status" 1>&2
+		exit 25
 	    fi
 	fi
     fi
 done
+if [[ -n "$V_FLAG" ]]; then
+    echo
+fi
 
 # move all but the last dated element of certain files into OLD
 #
+if [[ -n "$V_FLAG" ]]; then
+    echo '# Processing fileset'
+fi
 for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
     if [[ ! -f "$file" && -n "$I_FLAG" ]]; then
 	if [[ -n "$V_FLAG" ]]; then
 	    echo "# skipping the processing of: $file"
 	fi
 	continue
-    fi
-    if [[ -n "$V_FLAG" ]]; then
-	echo "# processing fileset: $file"
     fi
     find . -mindepth 1 -maxdepth 1 -type f \( \
       -name "$file"'.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]' -o \
@@ -339,9 +527,15 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
 	fi
     done
 done
+if [[ -n "$V_FLAG" ]]; then
+    echo
+fi
 
-# old top level from- and no-
+# move old top level from- and no- files
 #
+if [[ -n "$V_FLAG" ]]; then
+    echo '# Move old top level from- and no- files'
+fi
 find . -mindepth 1 -maxdepth 1 -type f \( -name 'from-*' -o -name 'no-*' \) -print | while read i; do
     if [[ -z "$N_FLAG" ]]; then
 	mv $V_FLAG "$i" OLD
@@ -353,15 +547,32 @@ find . -mindepth 1 -maxdepth 1 -type f \( -name 'from-*' -o -name 'no-*' \) -pri
 	echo mv $V_FLAG "$i" OLD
     fi
 done
+if [[ -n "$V_FLAG" ]]; then
+    echo
+fi
 
 # clean up .nfs files in sock that are older than 1 day
 #
-if [[ "${OS}" == "darwin" || "${OS}" == "macOS" ]]; then
-    find sock -name '.nfs*' -mtime +1 -type s -print0 | xargs -0 rm -f
-else
-    find sock -name '.nfs*' -mtime +1 -type s -print0 | xargs -0 -r rm -f
+if [[ -n "$V_FLAG" ]]; then
+    echo '# Clean up .nfs files'
+fi
+if [[ -z "$N_FLAG" ]]; then
+    SET=$(find sock -name '.nfs*' -mtime +1 -type s -print)
+    if [[ -n $SET ]]; then
+	find sock -name '.nfs*' -mtime +1 -type s -print0 |
+	  xargs $XARGS_V -0 rm $XARGS_V -f
+    fi
+elif [[ -n "$V_FLAG" ]]; then
+    SET=$(find sock -name '.nfs*' -mtime +1 -type s -print)
+    if [[ -n $SET ]]; then
+	find sock -name '.nfs*' -mtime +1 -type s -print0 |
+	  xargs -0 echo rm $XARGS_V -f
+    fi
+fi
+if [[ -n "$V_FLAG" ]]; then
+    echo
 fi
 
-# All Done!!! - Jessica Noll, Age 2
+# All Done!!! -- Jessica Noll, Age 2
 #
 exit 0
