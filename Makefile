@@ -12,7 +12,7 @@ DESTDIR= /usr/global/sbin
 SPECIAL_TOOLDIR= ~chongo/dot/tool
 SPECIAL_TOOLDIR_USER= chongo
 
-TARGETS= cleanupssh
+TARGETS= cleanupssh known_hosts_cleanup
 
 all: ${TARGETS}
 
@@ -23,8 +23,8 @@ clean quick_clean quick_distclean distclean:
 clobber quick_clobber: clean
 
 install: all
-	${INSTALL} -m 0555 cleanupssh ${DESTDIR}
+	${INSTALL} -m 0555 ${TARGETS} ${DESTDIR}
 	@-if [[ -d ${SPECIAL_TOOLDIR} ]]; then \
-	    echo ${INSTALL} -m 0555 -o ${SPECIAL_TOOLDIR_USER} cleanupssh ${SPECIAL_TOOLDIR}; \
-	    ${INSTALL} -m 0555 -o ${SPECIAL_TOOLDIR_USER} cleanupssh ${SPECIAL_TOOLDIR}; \
+	    echo ${INSTALL} -m 0555 -o ${SPECIAL_TOOLDIR_USER} ${TARGETS} ${SPECIAL_TOOLDIR}; \
+	    ${INSTALL} -m 0555 -o ${SPECIAL_TOOLDIR_USER} ${TARGETS} ${SPECIAL_TOOLDIR}; \
 	fi

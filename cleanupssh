@@ -28,15 +28,16 @@
 
 # parse args
 #
-export VERSION="3.1"
-export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-s] [-c user[:group]] [-V] [-h] dir
+export VERSION="3.2"
+export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-s] [-S] [-c user[:group]] [-V] [-h] dir
 
     -n		Do nothing (def: do)
     -v		Verbose mode (def: quiet)
     -f		Force cleanup if missing: authorized_keys config id_rsa id_rsa.pub known_hosts
     -i		Do not warn if missing:   authorized_keys config id_rsa id_rsa.pub known_hosts
 		    NOTE: -i implies -f
-    -s		Do not unique sort authorized_keys (def: do)
+    -s		Do not unique sort and cleanup authorized_keys (def: do)
+    -S		Do not unique sort and cleanup known_hosts (def: do with known_hosts_cleanup)
 
     -c user[:group]	Chown critical files as user:group (def: do not chown)
 			    NOTE: Ignored if UID != 0 (i.e., not root)
@@ -53,8 +54,9 @@ export XARGS_V=
 export F_FLAG=
 export I_FLAG=
 export S_FLAG=
+export CAP_S_FLAG=
 export USER_GROUP=
-while getopts hnvfisc:V flag; do
+while getopts hnvfisSc:V flag; do
     case "$flag" in
     h) echo "$USAGE" 1>&2; exit 0 ;;
     n) N_FLAG="-n" ;;
@@ -62,16 +64,19 @@ while getopts hnvfisc:V flag; do
     f) F_FLAG="-f" ;;
     i) I_FLAG="-i"; F_FLAG="-f" ;;
     s) S_FLAG="-s" ;;
+    S) CAP_S_FLAG="-S" ;;
     c) USER_GROUP="$OPTARG" ;;
     V) echo "$0: Version: $VERSION" ; exit 0 ;;
     ?) echo "$0: FATAL: unknown or invalid -flag" 1>&2 ;
        echo "$USAGE" 1>&2 ;
+       echo "$0: FATAL: exit 1" 1>&2
        exit 1 ;;
     esac
 done
 shift $(( OPTIND - 1 ));
 if [[ $# -ne 1 ]]; then
    echo "$USAGE" 1>&2 ;
+   echo "$0: FATAL: exit 2" 1>&2
    exit 2
 fi
 export dir="$1"
@@ -98,6 +103,7 @@ fi
 if [[ ! -d "$dir" ]]; then
     if [[ -z "$F_FLAG" ]]; then
 	echo "$0: FATAL: not a directory: $dir" 1>&2
+	echo "$0: FATAL: exit 3" 1>&2
 	exit 3
     else
 	if [[ -n "$V_FLAG" ]]; then
@@ -106,12 +112,14 @@ if [[ ! -d "$dir" ]]; then
 	mkdir -p --mode=0700 "$dir"
 	if [[ ! -d "$dir" ]]; then
 	    echo "$0: FATAL: cannot make directory: $dir" 1>&2
+	    echo "$0: FATAL: exit 4" 1>&2
 	    exit 4
 	fi
     fi
 fi
 if [[ -z "$N_FLAG" && ! -w "$dir" ]]; then
     echo "$0: FATAL: directory not writable: $dir" 1>&2
+    echo "$0: FATAL: exit 5" 1>&2
     exit 5
 fi
 if [[ -n "$V_FLAG" ]]; then
@@ -121,22 +129,52 @@ cd "$dir"
 status="$?"
 if [[ $status -ne 0 ]]; then
     echo "$0: FATAL: cd $dir, error code: $status" 1>&2
+    echo "$0: FATAL: exit 6" 1>&2
     exit 6
 fi
 if [[ -z "$F_FLAG" && ! -f authorized_keys ]]; then
     echo "$0: FATAL: $dir is missing authorized_keys" 1>&2
+    echo "$0: FATAL: exit 7" 1>&2
     exit 7
 fi
 if [[ -z "$F_FLAG" && ! -f id_rsa ]]; then
     echo "$0: FATAL: $dir is missing id_rsa" 1>&2
+    echo "$0: FATAL: exit 8" 1>&2
     exit 8
 fi
 if [[ -z "$F_FLAG" && ! -f id_rsa.pub ]]; then
     echo "$0: FATAL: $dir is missing id_rsa.pub" 1>&2
+    echo "$0: FATAL: exit 9" 1>&2
     exit 9
 fi
 if [[ -n "$V_FLAG" ]]; then
     echo
+fi
+
+# look for known_hosts_cleanup tool
+#
+export KNOWN_HOSTS_CLEANUP
+if [[ -z $CAP_S_FLAG ]]; then
+    KNOWN_HOSTS_CLEANUP=$(which known_hosts_cleanup 2>/dev/null)
+    status="$?"
+    if [[ $status -ne 0 || ! -x "$KNOWN_HOSTS_CLEANUP" ]]; then
+	# try the installed location of known_hosts_cleanup
+	KNOWN_HOSTS_CLEANUP="usr/global/sbin/known_hosts_cleanup"
+    fi
+    if [[ ! -x "$KNOWN_HOSTS_CLEANUP" ]]; then
+	# no known_hosts_cleanup is available
+	KNOWN_HOSTS_CLEANUP=
+	echo "$0: Warning: cannot find known_hosts_cleanup, will just sort known_hosts" 1>&2
+    else
+	if [[ -n "$V_FLAG" ]]; then
+	    echo
+	    echo "# will use known_hosts_cleanup from: $KNOWN_HOSTS_CLEANUP"
+	fi
+    fi
+else
+    if [[ -n "$V_FLAG" ]]; then
+	echo "# The -S flag will disable processing of known_hosts"
+    fi
 fi
 
 # form missing critical directories
@@ -150,6 +188,7 @@ if [[ ! -d sock ]]; then
 	status="$?"
 	if [[ ! -d sock ]]; then
 	    echo "$0: FATAL cannot mkdir sock, error code: $status" 1>&2
+	    echo "$0: FATAL: exit 10" 1>&2
 	    exit 10
 	fi
     elif [[ -n "$V_FLAG" ]]; then
@@ -161,6 +200,7 @@ if [[ -z "$N_FLAG" ]]; then
     status="$?"
     if [[ $status -ne 0 ]]; then
 	echo "$0: FATAL: chmod 0700 sock, error code: $status" 1>&2
+	echo "$0: FATAL: exit 11" 1>&2
 	exit 11
     fi
 elif [[ -n "$V_FLAG" ]]; then
@@ -168,6 +208,7 @@ elif [[ -n "$V_FLAG" ]]; then
 fi 2>&1 | grep -v ' retained as '
 if [[ -z "$N_FLAG" && ! -w sock ]]; then
     echo "$0: FATAL: directory not writable: sock" 1>&2
+    echo "$0: FATAL: exit 12" 1>&2
     exit 12
 fi
 if [[ ! -d OLD ]]; then
@@ -176,6 +217,7 @@ if [[ ! -d OLD ]]; then
 	status="$?"
 	if [[ ! -d OLD ]]; then
 	    echo "$0: FATAL cannot mkdir OLD, error code: $status" 1>&2
+	    echo "$0: FATAL: exit 13" 1>&2
 	    exit 13
 	fi
     elif [[ -n "$V_FLAG" ]]; then
@@ -187,6 +229,7 @@ if [[ -z "$N_FLAG" ]]; then
     status="$?"
     if [[ $status -ne 0 ]]; then
 	echo "$0: FATAL: chmod 0700 OLD, error code: $status" 1>&2
+	echo "$0: FATAL: exit 14" 1>&2
 	exit 14
     fi
 elif [[ -n "$V_FLAG" ]]; then
@@ -194,6 +237,7 @@ elif [[ -n "$V_FLAG" ]]; then
 fi 2>&1 | grep -v ' retained as '
 if [[ -z "$N_FLAG" && ! -w OLD ]]; then
     echo "$0: FATAL: directory not writable: OLD" 1>&2
+    echo "$0: FATAL: exit 15" 1>&2
     exit 15
 fi
 if [[ ! -d from ]]; then
@@ -202,6 +246,7 @@ if [[ ! -d from ]]; then
 	status="$?"
 	if [[ ! -d from ]]; then
 	    echo "$0: FATAL cannot mkdir from, error code: $status" 1>&2
+	    echo "$0: FATAL: exit 16" 1>&2
 	    exit 16
 	fi
     elif [[ -n "$V_FLAG" ]]; then
@@ -213,6 +258,7 @@ if [[ -z "$N_FLAG" ]]; then
     status="$?"
     if [[ $status -ne 0 ]]; then
 	echo "$0: FATAL: chmod 0700 from, error code: $status" 1>&2
+	echo "$0: FATAL: exit 17" 1>&2
 	exit 17
     fi
 elif [[ -n "$V_FLAG" ]]; then
@@ -220,6 +266,7 @@ elif [[ -n "$V_FLAG" ]]; then
 fi 2>&1 | grep -v ' retained as '
 if [[ -z "$N_FLAG" && ! -w from ]]; then
     echo "$0: FATAL: directory not writable: from" 1>&2
+    echo "$0: FATAL: exit 18" 1>&2
     exit 18
 fi
 if [[ -n "$V_FLAG" ]]; then
@@ -238,12 +285,14 @@ if [[ -z $S_FLAG ]]; then
 	SORTED_TMP=$(mktemp sorted-authorized_keys.XXXXXX)
 	if [[ -z $SORTED_TMP || ! -w $SORTED_TMP ]]; then
 	    echo "$0: FATAL: cannot create a temporary writable file" 1>&2
+	    echo "$0: FATAL: exit 19" 1>&2
 	    exit 19
 	fi
 	trap 'rm -f -- "$SORTED_TMP"' 0 1 2 3 15
     else
 	SORTED_TMP=$(mktemp -u sorted-authorized_keys.XXXXXX)
     fi
+    #
     if [[ -n "$V_FLAG" ]]; then
 	echo sort -u -k3 authorized_keys -o "$SORTED_TMP"
     fi
@@ -255,11 +304,14 @@ if [[ -z $S_FLAG ]]; then
     fi
     if [[ $status -ne 0 ]]; then
 	echo "$0: FATAL: sort -u -k3 authorized_keys -o $SORTED_TMP, error code: $status" 1>&2
+	echo "$0: FATAL: exit 20" 1>&2
 	exit 20
     fi
     #
     if cmp -s authorized_keys "$SORTED_TMP"; then
 	if [[ -n "$V_FLAG" ]]; then
+	    echo
+	    echo '# no change needed for authorized_keys'
 	    echo rm -f "$SORTED_TMP"
 	fi
 	if [[ -z "$N_FLAG" ]]; then
@@ -278,6 +330,7 @@ if [[ -z $S_FLAG ]]; then
 	    fi 2>&1 | grep -v ' retained as '
 	    if [[ $status -ne 0 ]]; then
 		echo "$0: FATAL: chown $USER_GROUP $SORTED_TMP, error code: $status" 1>&2
+		echo "$0: FATAL: exit 21" 1>&2
 		exit 21
 	    fi
 	fi
@@ -289,6 +342,7 @@ if [[ -z $S_FLAG ]]; then
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
 		echo "$0: FATAL: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
+		echo "$0: FATAL: exit 22" 1>&2
 		exit 22
 	    fi
 	fi 2>&1 | grep -v ' retained as '
@@ -300,7 +354,148 @@ if [[ -z $S_FLAG ]]; then
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
 		echo "$0: FATAL: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
+		echo "$0: FATAL: exit 23" 1>&2
 		exit 23
+	    fi
+	fi
+    fi
+else
+    if [[ -n "$V_FLAG" ]]; then
+	echo '# Disabled canonical order check on canonical order due to -s flag'
+    fi
+fi
+if [[ -n "$V_FLAG" ]]; then
+    echo
+fi
+
+# cleanup known_hosts unless -S
+#
+if [[ -z $CAP_S_FLAG ]]; then
+    if [[ -n "$V_FLAG" ]]; then
+	echo '# Cleanup and canonical order processing on known_hosts'
+    fi
+    #
+    if [[ ! -f known_hosts ]]; then
+	if [[ -e known_hosts ]]; then
+	    echo "$0: FATAL: known_hosts exists but is not a file" 1>&2
+	    echo "$0: FATAL: exit 24" 1>&2
+	    exit 24
+	else
+	    if [[ -z "$N_FLAG" ]]; then
+		if [[ -n "$V_FLAG" ]]; then
+		    echo touch known_hosts
+		fi
+		touch known_hosts
+		status="$?"
+	    else
+		status=0
+	    fi
+	    if [[ $status -ne 0 ]]; then
+		echo "$0: FATAL: touch known_hosts, error code: $status" 1>&2
+		echo "$0: FATAL: exit 25" 1>&2
+		exit 25
+	    fi
+	fi
+    fi
+    if [[ ! -f known_hosts ]]; then
+	echo "$0: FATAL: cannot create known_hosts" 1>&2
+	echo "$0: FATAL: exit 26" 1>&2
+	exit 26
+    fi
+    #
+    export SORTED_TMP=
+    if [[ -z "$N_FLAG" ]]; then
+	SORTED_TMP=$(mktemp sorted-known_hosts.XXXXXX)
+	if [[ -z $SORTED_TMP || ! -w $SORTED_TMP ]]; then
+	    echo "$0: FATAL: cannot create a temporary writable file" 1>&2
+	    echo "$0: FATAL: exit 27" 1>&2
+	    exit 27
+	fi
+	trap 'rm -f -- "$SORTED_TMP"' 0 1 2 3 15
+    else
+	SORTED_TMP=$(mktemp -u sorted-known_hosts.XXXXXX)
+    fi
+    #
+    if [[ -z "$KNOWN_HOSTS_CLEANUP" ]]; then
+	if [[ -n "$V_FLAG" ]]; then
+	    echo sort -u known_hosts -o "$SORTED_TMP"
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    sort -u known_hosts -o "$SORTED_TMP"
+	    status="$?"
+	else
+	    status=0
+	fi
+	if [[ $status -ne 0 ]]; then
+	    echo "$0: FATAL: sort -u known_hosts -o $SORTED_TMP, error code: $status" 1>&2
+	    echo "$0: FATAL: exit 28" 1>&2
+	    exit 28
+	fi
+    else
+	if [[ -n "$V_FLAG" ]]; then
+	    echo "$KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP"
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    "$KNOWN_HOSTS_CLEANUP" -v known_hosts > "$SORTED_TMP"
+	    status="$?"
+	else
+	    status=0
+	fi
+	if [[ $status -ne 0 ]]; then
+	    echo "$0: FATAL: $KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP, error code: $status" 1>&2
+	    echo "$0: FATAL: exit 29" 1>&2
+	    exit 29
+	fi
+    fi
+    #
+    if cmp -s known_hosts "$SORTED_TMP"; then
+	if [[ -n "$V_FLAG" ]]; then
+	    echo
+	    echo '# no change needed for known_hosts'
+	    echo rm -f "$SORTED_TMP"
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    rm -f "$SORTED_TMP"
+	fi
+    else
+	if [[ -n "$USER_GROUP" ]]; then
+	    if [[ -n "$V_FLAG" ]]; then
+		echo chown "$V_FLAG" "$USER_GROUP" "$SORTED_TMP"
+	    fi
+	    if [[ -z "$N_FLAG" ]]; then
+		chown $V_FLAG "$USER_GROUP" "$SORTED_TMP"
+		status="$?"
+	    else
+		status=0
+	    fi 2>&1 | grep -v ' retained as '
+	    if [[ $status -ne 0 ]]; then
+		echo "$0: FATAL: chown $USER_GROUP $SORTED_TMP, error code: $status" 1>&2
+		echo "$0: FATAL: exit 30" 1>&2
+		exit 30
+	    fi
+	fi
+	if [[ -n "$V_FLAG" ]]; then
+	    echo chmod "$V_FLAG" 0664 "$SORTED_TMP"
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    chmod $V_FLAG 0664 "$SORTED_TMP"
+	    status="$?"
+	    if [[ $status -ne 0 ]]; then
+		echo "$0: FATAL: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
+		echo "$0: FATAL: exit 31" 1>&2
+		exit 31
+	    fi
+	fi 2>&1 | grep -v ' retained as '
+	if [[ -n "$V_FLAG" ]]; then
+	    echo mv -f "$V_FLAG" "$SORTED_TMP" known_hosts
+	fi
+	if [[ -z "$N_FLAG" ]]; then
+	    mv -f $V_FLAG "$SORTED_TMP" known_hosts
+	    status="$?"
+	    if [[ $status -ne 0 ]]; then
+		echo "$0: FATAL: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
+		echo "$0: FATAL: exit 32" 1>&2
+		exit 32
 	    fi
 	fi
     fi
@@ -476,7 +671,8 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
     fi
     if [[ -z $date_file ]]; then
 	echo "$0: FATAL: cannot determinte date for file: $file" 1>&2
-	exit 24
+	echo "$0: FATAL: exit 33" 1>&2
+	exit 33
     fi
 
     # unless the timestamped file is a copy of the original, form it
@@ -490,7 +686,8 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
 		echo "$0: FATAL: cp -p $V_FLAG $file $date_file, error code: $status" 1>&2
-		exit 25
+		echo "$0: FATAL: exit 34" 1>&2
+		exit 34
 	    fi
 	fi
     fi
