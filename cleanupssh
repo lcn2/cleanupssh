@@ -28,7 +28,7 @@
 
 # parse args
 #
-export VERSION="3.2"
+export VERSION="3.2.1"
 export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-s] [-S] [-c user[:group]] [-V] [-h] dir
 
     -n		Do nothing (def: do)

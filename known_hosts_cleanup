@@ -41,7 +41,7 @@ import argparse
 
 # setup
 #
-version = '3.2'
+version = '3.2.1'
 
 # parse args
 #
@@ -340,7 +340,7 @@ for key, known_host in known_hosts.items():
     line_hosts = sorted(known_host['hosts'], key=cmp_to_key(hostname_order))
     known_host['first_host'] = line_hosts[0]
     known_host['host_joined_sorted'] = ",".join(line_hosts)
-    known_host['line'] = known_host['host_joined_sorted'] + ' ' + known_host['keytype'] + ' ' + key
+    known_host['line'] = known_host['host_joined_sorted'] + ' ' + known_host['keytype'] + ' ' + known_host['fingerprint']
 
 # build the canonical_known_hosts dictionary, keyed by first_host@keytype with known_hosts line values
 #
