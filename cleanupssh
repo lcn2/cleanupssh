@@ -445,8 +445,13 @@ if [[ -z $CAP_S_FLAG ]]; then
 	    echo "$KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP"
 	fi
 	if [[ -z "$N_FLAG" ]]; then
-	    "$KNOWN_HOSTS_CLEANUP" -v known_hosts > "$SORTED_TMP"
-	    status="$?"
+	    if [[ -n "$V_FLAG" ]]; then
+		"$KNOWN_HOSTS_CLEANUP" -v known_hosts > "$SORTED_TMP"
+		status="$?"
+	    else
+		"$KNOWN_HOSTS_CLEANUP" known_hosts > "$SORTED_TMP"
+		status="$?"
+	    fi
 	else
 	    status=0
 	fi
