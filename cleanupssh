@@ -28,7 +28,7 @@
 
 # parse args
 #
-export VERSION="3.2.1"
+export VERSION="3.2.2"
 export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-s] [-S] [-c user[:group]] [-V] [-h] dir
 
     -n		Do nothing (def: do)
@@ -159,12 +159,21 @@ if [[ -z $CAP_S_FLAG ]]; then
     status="$?"
     if [[ $status -ne 0 || ! -x "$KNOWN_HOSTS_CLEANUP" ]]; then
 	# try the installed location of known_hosts_cleanup
-	KNOWN_HOSTS_CLEANUP="usr/global/sbin/known_hosts_cleanup"
+	KNOWN_HOSTS_CLEANUP="/usr/global/sbin/known_hosts_cleanup"
     fi
     if [[ ! -x "$KNOWN_HOSTS_CLEANUP" ]]; then
-	# no known_hosts_cleanup is available
-	KNOWN_HOSTS_CLEANUP=
-	echo "$0: Warning: cannot find known_hosts_cleanup, will just sort known_hosts" 1>&2
+	# try the other installed location of known_hosts_cleanup
+	KNOWN_HOSTS_CLEANUP="$HOME/dot/tool/known_hosts_cleanup"
+	if [[ ! -x "$KNOWN_HOSTS_CLEANUP" ]]; then
+	    # no known_hosts_cleanup is available
+	    KNOWN_HOSTS_CLEANUP=
+	    echo "$0: Warning: cannot find known_hosts_cleanup, will just sort known_hosts" 1>&2
+	else
+	    if [[ -n "$V_FLAG" ]]; then
+		echo
+		echo "# will use known_hosts_cleanup also from: $KNOWN_HOSTS_CLEANUP"
+	    fi
+	fi
     else
 	if [[ -n "$V_FLAG" ]]; then
 	    echo

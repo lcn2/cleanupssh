@@ -41,7 +41,7 @@ import argparse
 
 # setup
 #
-version = '3.2.1'
+version = '3.2.2'
 
 # parse args
 #
@@ -50,7 +50,7 @@ parser = argparse.ArgumentParser(
         description='cleanup an ssh known_hosts file',
         epilog='version'+version)
 parser.add_argument('-v', '--verbose',
-        help='verbose messages to stderr (def: only Warnings to stderr)',
+        help='verbose messages to stderr (def: just Warnings to stderr)',
         dest='verbose',
         action='store_true')
 parser.add_argument('known_hosts',
