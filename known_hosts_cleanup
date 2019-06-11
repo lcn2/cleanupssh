@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 # encoding: utf-8
 #
 # known_hosts_cleanup - cleanup known_hosts and output in canonical order
@@ -41,7 +41,7 @@ import argparse
 
 # setup
 #
-version = '3.2.2'
+version = '3.2.3'
 
 # parse args
 #

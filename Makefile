@@ -23,9 +23,8 @@ clean quick_clean quick_distclean distclean:
 clobber quick_clobber: clean
 
 install: all
-	@if [[ ! -x /usr/local/bin/python3 ]]; then \
-	    echo "must be python3 executable: /usr/local/bin/python3" 1>&2; \
-	    echo "consider doing: ln -s -f /usr/bin/python3 /usr/local/bin/python3" 1>&2; \
+	@if [[ ! `which python3 2>/dev/null` ]]; then \
+	    echo "known_hosts_cleanup requires python3 executable, python3 not found" 1>&2; \
 	    exit 1; \
 	fi
 	${INSTALL} -m 0555 ${TARGETS} ${DESTDIR}
