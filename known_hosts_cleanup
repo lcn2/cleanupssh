@@ -2,7 +2,7 @@
 # encoding: utf-8
 #
 # known_hosts_cleanup - cleanup known_hosts and output in canonical order
-# 
+#
 # We will combine known_hosts lines so that each ssh fingerprint is found once
 # and so that the hosts for the ssh fingerprint are listed in a canonoical order
 # and so that the lines are sorted by the 1st canonical host + key type.
@@ -41,7 +41,7 @@ import argparse
 
 # setup
 #
-version = '3.2.3'
+version = '3.2.4'
 
 # parse args
 #
@@ -140,7 +140,6 @@ def hostname_order(a, b):
         hostnames with same level of sub-domains are compared
            in lowercase string order starting least significant name
            this z.a.com is greater than y.b.com
-
 
         returns -1 if a < b
         returns 0 if a == b
