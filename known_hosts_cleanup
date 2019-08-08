@@ -41,7 +41,7 @@ import argparse
 
 # setup
 #
-version = '3.2.5'
+version = '3.2.6'
 
 # parse args
 #
@@ -57,7 +57,8 @@ parser.add_argument('known_hosts',
         help='the ssh known_hosts file')
 args = parser.parse_args()
 if (args.verbose):
-    print('about to cleanup', args.known_hosts, file=sys.stderr)
+    print('# known_hosts_cleanup version: '+version, file=sys.stderr)
+    print('# about write to stdout, a cleaned version of:', args.known_hosts, file=sys.stderr)
 
 # wrapper for old comparison function
 #
@@ -356,6 +357,6 @@ for key, known_host_line in sorted(canonical_known_hosts.items()):
 # verbose output of actions
 #
 if (args.verbose):
-    print('cleanup of', args.known_hosts, 'is complete', file=sys.stderr)
-    print('line count of old', args.known_hosts+'.pre-cleanup', 'is', line_number, file=sys.stderr);
-    print('line count of new', args.known_hosts, 'is', len(known_hosts), file=sys.stderr)
+    print('# wrote to stdout, a cleaned up version of:', args.known_hosts, file=sys.stderr)
+    print('# line count of orignal', args.known_hosts, 'is:', line_number, file=sys.stderr);
+    print('# line count of the new', args.known_hosts, 'is:', len(known_hosts), file=sys.stderr)
