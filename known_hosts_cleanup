@@ -41,14 +41,14 @@ import argparse
 
 # setup
 #
-version = '3.2.6'
+version = '3.2.7'
 
 # parse args
 #
 parser = argparse.ArgumentParser(
         prog='known_hosts_cleanup',
         description='cleanup an ssh known_hosts file',
-        epilog='version'+version)
+        epilog='version: '+version)
 parser.add_argument('-v', '--verbose',
         help='verbose messages to stderr (def: just Warnings to stderr)',
         dest='verbose',

@@ -28,7 +28,7 @@
 
 # parse args
 #
-export VERSION="3.2.6"
+export VERSION="3.2.7"
 export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-c user[:group]] [-V] [-h] dir
 
     -n		Do nothing (def: do)
@@ -208,45 +208,48 @@ if [[ -z $CAP_S_FLAG ]]; then
 else
     if [[ -n "$V_FLAG" ]]; then
 	echo "# The -S flag will disable processing of known_hosts"
+	KNOWN_HOSTS_CLEANUP=
     fi
 fi
 
 # look for python3
 #
 export PYTHON3_VERSION
-if [[ -z "$PYTHON3" || ! -x "$PYTHON3" ]]; then
-    if [[ -x /usr/bin/python3 ]]; then
-	PYTHON3="/usr/bin/python3"
-    elif [[ -x /Library/Frameworks/Python.framework/Versions/3.7/bin/python3 ]]; then
-	PYTHON3="/Library/Frameworks/Python.framework/Versions/3.7/bin/python3"
-    elif [[ -x /bin/python3 ]]; then
-	PYTHON3="/bin/python3"
-    elif [[ -x /usr/local/bin/python3 ]]; then
-	PYTHON3="/usr/local/bin/python3"
-    elif [[ -x /usr/global/bin/python3 ]]; then
-	PYTHON3="/usr/global/bin/python3"
-    else
-	PYTHON3=$(which python3 2>/dev/null)
+if [[ -z "$CAP_S_FLAG" ]]; then
+    if [[ -z "$PYTHON3" || ! -x "$PYTHON3" ]]; then
+	if [[ -x /usr/bin/python3 ]]; then
+	    PYTHON3="/usr/bin/python3"
+	elif [[ -x /Library/Frameworks/Python.framework/Versions/3.7/bin/python3 ]]; then
+	    PYTHON3="/Library/Frameworks/Python.framework/Versions/3.7/bin/python3"
+	elif [[ -x /bin/python3 ]]; then
+	    PYTHON3="/bin/python3"
+	elif [[ -x /usr/local/bin/python3 ]]; then
+	    PYTHON3="/usr/local/bin/python3"
+	elif [[ -x /usr/global/bin/python3 ]]; then
+	    PYTHON3="/usr/global/bin/python3"
+	else
+	    PYTHON3=$(which python3 2>/dev/null)
+	fi
     fi
-fi
-if [[ -z $PYTHON3 ]]; then
-    echo "$0: Warning: cannot find python3 executable" 1>&2
-    echo "$0: Warning: forcing -S to disable known_hosts_cleanup" 1>&2
-    CAP_S_FLAG="-S"
-else
-    if [[ -n "$V_FLAG" ]]; then
-	echo
-	echo "# testing version of python3 using: $PYTHON3 -V 2>/dev/null"
-    fi
-    PYTHON3_VERSION=$("$PYTHON3" -V 2>/dev/null)
-    status="$?"
-    if [[ $status -ne 0 || -z "$PYTHON3_VERSION" ]]; then
-	echo "$0: Warning: cannot determine version of python3: $PYTHON3" 1>&2
-	echo "$0: Warning: python3 -V, error code: $status" 1>&2
+    if [[ -z $PYTHON3 ]]; then
+	echo "$0: Warning: cannot find python3 executable" 1>&2
 	echo "$0: Warning: forcing -S to disable known_hosts_cleanup" 1>&2
 	CAP_S_FLAG="-S"
-    elif [[ -n "$V_FLAG" ]]; then
-	echo "# python3 version: $PYTHON3_VERSION"
+    else
+	if [[ -n "$V_FLAG" ]]; then
+	    echo
+	    echo "# testing version of python3 using: $PYTHON3 -V 2>/dev/null"
+	fi
+	PYTHON3_VERSION=$("$PYTHON3" -V 2>/dev/null)
+	status="$?"
+	if [[ $status -ne 0 || -z "$PYTHON3_VERSION" ]]; then
+	    echo "$0: Warning: cannot determine version of python3: $PYTHON3" 1>&2
+	    echo "$0: Warning: python3 -V, error code: $status" 1>&2
+	    echo "$0: Warning: forcing -S to disable known_hosts_cleanup" 1>&2
+	    CAP_S_FLAG="-S"
+	elif [[ -n "$V_FLAG" ]]; then
+	    echo "# python3 version: $PYTHON3_VERSION"
+	fi
     fi
 fi
 
