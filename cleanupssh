@@ -28,16 +28,19 @@
 
 # parse args
 #
-export VERSION="3.2.7"
+export VERSION="3.2.8"
 export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-c user[:group]] [-V] [-h] dir
 
     -n		Do nothing (def: do)
     -v		Verbose mode (def: quiet)
 
     -f		Force cleanup if missing: authorized_keys config id_rsa id_rsa.pub known_hosts
+		    NOTE: if id_rsa.LOCKED exists, OK if id_rsa is missing
+		    NOTE: if id_rsa.pub.LOCKED exists, OK if id_rsa.pub is missing
     -i		Do not warn if missing:   authorized_keys config id_rsa id_rsa.pub known_hosts
 		    NOTE: -i implies -f
     -t		Touch to form empty authorized_keys config known_hosts if missing (def: do not touch)
+		    NOTE: if authorized_keys.LOCKED exists, authorized_keys is not touched
     -s		Do not unique sort and cleanup authorized_keys (def: do)
     -S		Do not unique sort and cleanup known_hosts (def: do with known_hosts_cleanup)
 
@@ -152,20 +155,39 @@ if [[ $status -ne 0 ]]; then
     echo "$0: FATAL: exit 6" 1>&2
     exit 6
 fi
-if [[ -z "$F_FLAG" && -z "$T_FLAG" && ! -f authorized_keys ]]; then
+if [[ -n "$V_FLAG" ]]; then
+    echo "# initial state of $dir"
+    ls -l
+fi
+if [[ -z "$F_FLAG" && -z "$T_FLAG" && ! -f authorized_keys && ! -f authorized_keys.LOCKED ]]; then
     echo "$0: FATAL: $dir is missing authorized_keys" 1>&2
     echo "$0: FATAL: exit 7" 1>&2
     exit 7
 fi
-if [[ -z "$F_FLAG" && ! -f id_rsa ]]; then
-    echo "$0: FATAL: $dir is missing id_rsa" 1>&2
+if [[ -z "$F_FLAG" && -z "$T_FLAG" && -s authorized_keys && -f authorized_keys.LOCKED ]]; then
+    echo "$0: FATAL: $dir has authorized_keys.LOCKED and non-empty authorized_keys" 1>&2
     echo "$0: FATAL: exit 8" 1>&2
     exit 8
 fi
-if [[ -z "$F_FLAG" && ! -f id_rsa.pub ]]; then
-    echo "$0: FATAL: $dir is missing id_rsa.pub" 1>&2
+if [[ -z "$F_FLAG" && ! -f id_rsa && ! -f id_rsa.LOCKED ]]; then
+    echo "$0: FATAL: $dir is missing id_rsa" 1>&2
     echo "$0: FATAL: exit 9" 1>&2
     exit 9
+fi
+if [[ -z "$F_FLAG" && -f id_rsa && -f id_rsa.LOCKED ]]; then
+    echo "$0: FATAL: $dir has both id_rsa and id_rsa.LOCKED" 1>&2
+    echo "$0: FATAL: exit 10" 1>&2
+    exit 10
+fi
+if [[ -z "$F_FLAG" && ! -f id_rsa.pub && ! -f id_rsa.pub.LOCKED ]]; then
+    echo "$0: FATAL: $dir is missing id_rsa.pub" 1>&2
+    echo "$0: FATAL: exit 11" 1>&2
+    exit 11
+fi
+if [[ -z "$F_FLAG" && -f id_rsa.pub && -f id_rsa.pub.LOCKED ]]; then
+    echo "$0: FATAL: $dir has both id_rsa.pub and id_rsa.pub.LOCKED" 1>&2
+    echo "$0: FATAL: exit 12" 1>&2
+    exit 12
 fi
 if [[ -n "$V_FLAG" ]]; then
     echo
@@ -265,8 +287,8 @@ if [[ ! -d sock ]]; then
 	status="$?"
 	if [[ ! -d sock ]]; then
 	    echo "$0: FATAL cannot mkdir sock, error code: $status" 1>&2
-	    echo "$0: FATAL: exit 10" 1>&2
-	    exit 10
+	    echo "$0: FATAL: exit 13" 1>&2
+	    exit 13
 	fi
     elif [[ -n "$V_FLAG" ]]; then
 	echo mkdir $V_FLAG sock
@@ -277,16 +299,16 @@ if [[ -z "$N_FLAG" ]]; then
     status="$?"
     if [[ $status -ne 0 ]]; then
 	echo "$0: FATAL: chmod 0700 sock, error code: $status" 1>&2
-	echo "$0: FATAL: exit 11" 1>&2
-	exit 11
+	echo "$0: FATAL: exit 14" 1>&2
+	exit 14
     fi
 elif [[ -n "$V_FLAG" ]]; then
     echo chmod $V_FLAG 0700 sock
 fi 2>&1 | grep -v ' retained as '
 if [[ -z "$N_FLAG" && ! -w sock ]]; then
     echo "$0: FATAL: directory not writable: sock" 1>&2
-    echo "$0: FATAL: exit 12" 1>&2
-    exit 12
+    echo "$0: FATAL: exit 15" 1>&2
+    exit 15
 fi
 if [[ ! -d OLD ]]; then
     if [[ -z "$N_FLAG" ]]; then
@@ -294,8 +316,8 @@ if [[ ! -d OLD ]]; then
 	status="$?"
 	if [[ ! -d OLD ]]; then
 	    echo "$0: FATAL cannot mkdir OLD, error code: $status" 1>&2
-	    echo "$0: FATAL: exit 13" 1>&2
-	    exit 13
+	    echo "$0: FATAL: exit 16" 1>&2
+	    exit 16
 	fi
     elif [[ -n "$V_FLAG" ]]; then
 	echo mkdir $V_FLAG OLD
@@ -306,16 +328,16 @@ if [[ -z "$N_FLAG" ]]; then
     status="$?"
     if [[ $status -ne 0 ]]; then
 	echo "$0: FATAL: chmod 0700 OLD, error code: $status" 1>&2
-	echo "$0: FATAL: exit 14" 1>&2
-	exit 14
+	echo "$0: FATAL: exit 17" 1>&2
+	exit 17
     fi
 elif [[ -n "$V_FLAG" ]]; then
     echo chmod $V_FLAG 0700 OLD
 fi 2>&1 | grep -v ' retained as '
 if [[ -z "$N_FLAG" && ! -w OLD ]]; then
     echo "$0: FATAL: directory not writable: OLD" 1>&2
-    echo "$0: FATAL: exit 15" 1>&2
-    exit 15
+    echo "$0: FATAL: exit 18" 1>&2
+    exit 18
 fi
 if [[ ! -d from ]]; then
     if [[ -z "$N_FLAG" ]]; then
@@ -323,8 +345,8 @@ if [[ ! -d from ]]; then
 	status="$?"
 	if [[ ! -d from ]]; then
 	    echo "$0: FATAL cannot mkdir from, error code: $status" 1>&2
-	    echo "$0: FATAL: exit 16" 1>&2
-	    exit 16
+	    echo "$0: FATAL: exit 19" 1>&2
+	    exit 19
 	fi
     elif [[ -n "$V_FLAG" ]]; then
 	echo mkdir $V_FLAG from
@@ -335,28 +357,62 @@ if [[ -z "$N_FLAG" ]]; then
     status="$?"
     if [[ $status -ne 0 ]]; then
 	echo "$0: FATAL: chmod 0700 from, error code: $status" 1>&2
-	echo "$0: FATAL: exit 17" 1>&2
-	exit 17
+	echo "$0: FATAL: exit 20" 1>&2
+	exit 20
     fi
 elif [[ -n "$V_FLAG" ]]; then
     echo chmod $V_FLAG 0700 from
 fi 2>&1 | grep -v ' retained as '
 if [[ -z "$N_FLAG" && ! -w from ]]; then
     echo "$0: FATAL: directory not writable: from" 1>&2
-    echo "$0: FATAL: exit 18" 1>&2
-    exit 18
+    echo "$0: FATAL: exit 21" 1>&2
+    exit 21
 fi
 if [[ -n "$V_FLAG" ]]; then
     echo
 fi
 
-# form empty authorized_keys config known_hosts if missing and -m
+# if authorized_keys.LOCKED then there should be no authorized_keys
+#
+export TOUCH_SET="config known_hosts"
+if [[ -f authorized_keys.LOCKED ]]; then
+    TOUCH_SET="$TOUCH_SET authorized_keys.LOCKED"
+    if [[ -f authorized_keys ]]; then
+	if [[ -s authorized_keys ]]; then
+	    echo "$0: Warning: found both authorized_keys.LOCKED and non-empty authorized_keys" 1>&2
+	    TOUCH_SET="$TOUCH_SET authorized_keys"
+	else
+	    if [[ -n "$V_FLAG" ]]; then
+		echo "$0: notice: empty authorized_keys with authorized_keys.LOCKED" 1>&2
+	    fi
+	    if [[ -n "$N_FLAG" ]]; then
+		echo "rm -f authorized_keys"
+	    else
+		if [[ -n "$V_FLAG" ]]; then
+		    echo rm -f authorized_keys
+		fi
+		rm -f authorized_keys
+		if [[ -f authorized_keys ]]; then
+		    echo "$0: Warning: cannot remove empty authorized_keys" 1>&2
+		    TOUCH_SET="$TOUCH_SET authorized_keys"
+		fi
+	    fi
+	fi
+	if [[ -n "$V_FLAG" ]]; then
+	    echo
+	fi
+    fi
+else
+    TOUCH_SET="$TOUCH_SET authorized_keys"
+fi
+
+# form empty authorized_keys (and/or authorized_keys.LOCKED) config known_hosts if missing and -t
 #
 if [[ -n "$T_FLAG" ]]; then
     if [[ -n "$V_FLAG" ]]; then
-	echo '# -m flag processing - form empty authorized_keys config known_hosts if missing'
+	echo "# -t flag processing - form empty $TOUCH_SET if missing"
     fi
-    for file in authorized_keys config known_hosts; do
+    for file in $TOUCH_SET; do
 	if [[ -e "$file" ]]; then
 	    if [[ -n "$V_FLAG" ]]; then
 		ls -ld "$file"
@@ -382,49 +438,53 @@ if [[ -n "$T_FLAG" ]]; then
     fi
 fi
 
-# unless -s, be sure that authorized_keys is in canonical order
+# unless -s, be sure that authorized_keys or authorized_keys.LOCKED is in canonical order
 #
+export file="authorized_keys"
+if [[ -f authorized_keys.LOCKED ]]; then
+    file="authorized_keys.LOCKED"
+fi
 if [[ -z $S_FLAG ]]; then
     if [[ -n "$V_FLAG" ]]; then
-	echo '# Canonical order processing on authorized_keys'
+	echo "# Canonical order processing on $file"
     fi
     #
     export SORTED_TMP=
     if [[ -z "$N_FLAG" ]]; then
-	SORTED_TMP=$(mktemp sorted-authorized_keys.XXXXXX)
+	SORTED_TMP=$(mktemp sorted-$file.XXXXXX)
 	if [[ -z $SORTED_TMP || ! -w $SORTED_TMP ]]; then
 	    echo "$0: FATAL: cannot create a temporary writable file" 1>&2
-	    echo "$0: FATAL: exit 19" 1>&2
-	    exit 19
+	    echo "$0: FATAL: exit 22" 1>&2
+	    exit 22
 	fi
 	trap 'rm -f -- "$SORTED_TMP"' 0 1 2 3 15
     else
-	SORTED_TMP=$(mktemp -u sorted-authorized_keys.XXXXXX)
+	SORTED_TMP=$(mktemp -u sorted-$file.XXXXXX)
     fi
     #
     if [[ -n "$V_FLAG" ]]; then
-	echo sort -u -k3 authorized_keys -o "$SORTED_TMP"
+	echo sort -u -k3 $file -o "$SORTED_TMP"
     fi
     if [[ -z "$N_FLAG" ]]; then
-	sort -u -k3 authorized_keys -o "$SORTED_TMP"
+	sort -u -k3 $file -o "$SORTED_TMP"
 	status="$?"
     else
 	status=0
     fi
     if [[ $status -ne 0 ]]; then
 	if [[ -z "$F_FLAG" ]]; then
-	    echo "$0: FATAL: sort -u -k3 authorized_keys -o $SORTED_TMP, error code: $status" 1>&2
-	    echo "$0: FATAL: exit 20" 1>&2
-	    exit 20
+	    echo "$0: FATAL: sort -u -k3 $file -o $SORTED_TMP, error code: $status" 1>&2
+	    echo "$0: FATAL: exit 23" 1>&2
+	    exit 23
 	else
-	    echo "$0: Warning: sort -u -k3 authorized_keys -o $SORTED_TMP, error code: $status" 1>&2
+	    echo "$0: Warning: sort -u -k3 $file -o $SORTED_TMP, error code: $status" 1>&2
 	fi
     fi
     #
-    if cmp -s authorized_keys "$SORTED_TMP"; then
+    if cmp -s $file "$SORTED_TMP"; then
 	if [[ -n "$V_FLAG" ]]; then
 	    echo
-	    echo '# no change needed for authorized_keys'
+	    echo "# no change needed for $file"
 	    echo rm -f "$SORTED_TMP"
 	fi
 	if [[ -z "$N_FLAG" ]]; then
@@ -444,11 +504,11 @@ if [[ -z $S_FLAG ]]; then
 	    if [[ $status -ne 0 ]]; then
 		if [[ -z "$F_FLAG" ]]; then
 		    echo "$0: FATAL: chown $USER_GROUP $SORTED_TMP, error code: $status" 1>&2
-		    echo "$0: FATAL: exit 21" 1>&2
-		    exit 21
+		    echo "$0: FATAL: exit 24" 1>&2
+		    exit 24
 		else
 		    echo "$0: Warning: chown $USER_GROUP $SORTED_TMP, error code: $status" 1>&2
-	    	fi
+		fi
 	    fi
 	fi
 	if [[ -n "$V_FLAG" ]]; then
@@ -460,24 +520,24 @@ if [[ -z $S_FLAG ]]; then
 	    if [[ $status -ne 0 ]]; then
 		if [[ -z "$F_FLAG" ]]; then
 		    echo "$0: FATAL: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
-		    echo "$0: FATAL: exit 22" 1>&2
-		    exit 22
+		    echo "$0: FATAL: exit 25" 1>&2
+		    exit 25
 		else
 		    echo "$0: Warning: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
 		fi
 	    fi
 	fi 2>&1 | grep -v ' retained as '
 	if [[ -n "$V_FLAG" ]]; then
-	    echo mv -f "$V_FLAG" "$SORTED_TMP" authorized_keys
+	    echo mv -f "$V_FLAG" "$SORTED_TMP" $file
 	fi
 	if [[ -z "$N_FLAG" ]]; then
-	    mv -f $V_FLAG "$SORTED_TMP" authorized_keys
+	    mv -f $V_FLAG "$SORTED_TMP" $file
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
 		if [[ -z "$F_FLAG" ]]; then
 		    echo "$0: FATAL: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
-		    echo "$0: FATAL: exit 23" 1>&2
-		    exit 23
+		    echo "$0: FATAL: exit 26" 1>&2
+		    exit 26
 		else
 		    echo "$0: Warning: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
 		fi
@@ -504,8 +564,8 @@ if [[ -z $CAP_S_FLAG ]]; then
 	if [[ -e known_hosts ]]; then
 	    if [[ -z "$F_FLAG" ]]; then
 		echo "$0: FATAL: known_hosts exists but is not a file" 1>&2
-		echo "$0: FATAL: exit 24" 1>&2
-		exit 24
+		echo "$0: FATAL: exit 27" 1>&2
+		exit 27
 	    else
 		echo "$0: Warning: known_hosts exists but is not a file" 1>&2
 	    fi
@@ -522,8 +582,8 @@ if [[ -z $CAP_S_FLAG ]]; then
 	    if [[ $status -ne 0 ]]; then
 		if [[ -z "$F_FLAG" ]]; then
 		    echo "$0: FATAL: touch known_hosts, error code: $status" 1>&2
-		    echo "$0: FATAL: exit 25" 1>&2
-		    exit 25
+		    echo "$0: FATAL: exit 28" 1>&2
+		    exit 28
 		else
 		    echo "$0: Warning: touch known_hosts, error code: $status" 1>&2
 		fi
@@ -533,8 +593,8 @@ if [[ -z $CAP_S_FLAG ]]; then
     if [[ ! -f known_hosts ]]; then
 	if [[ -z "$F_FLAG" ]]; then
 	    echo "$0: FATAL: cannot create known_hosts" 1>&2
-	    echo "$0: FATAL: exit 26" 1>&2
-	    exit 26
+	    echo "$0: FATAL: exit 29" 1>&2
+	    exit 29
 	else
 	    echo "$0: Warning: cannot create known_hosts" 1>&2
 	fi
@@ -546,8 +606,8 @@ if [[ -z $CAP_S_FLAG ]]; then
 	if [[ -z $SORTED_TMP || ! -w $SORTED_TMP ]]; then
 	    if [[ -z "$F_FLAG" ]]; then
 		echo "$0: FATAL: cannot create a temporary writable file" 1>&2
-		echo "$0: FATAL: exit 27" 1>&2
-		exit 27
+		echo "$0: FATAL: exit 30" 1>&2
+		exit 30
 	    else
 		echo "$0: Warning: cannot create a temporary writable file" 1>&2
 	    fi
@@ -570,8 +630,8 @@ if [[ -z $CAP_S_FLAG ]]; then
 	if [[ $status -ne 0 ]]; then
 	    if [[ -z "$F_FLAG" ]]; then
 		echo "$0: FATAL: sort -u known_hosts -o $SORTED_TMP, error code: $status" 1>&2
-		echo "$0: FATAL: exit 28" 1>&2
-		exit 28
+		echo "$0: FATAL: exit 31" 1>&2
+		exit 31
 	    else
 		echo "$0: Warning: sort -u known_hosts -o $SORTED_TMP, error code: $status" 1>&2
 	    fi
@@ -595,8 +655,8 @@ if [[ -z $CAP_S_FLAG ]]; then
 	if [[ $status -ne 0 ]]; then
 	    if [[ -z "$F_FLAG" ]]; then
 		echo "$0: FATAL: $PYTHON3 $KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP, error code: $status" 1>&2
-		echo "$0: FATAL: exit 29" 1>&2
-		exit 29
+		echo "$0: FATAL: exit 32" 1>&2
+		exit 32
 	    else
 		echo "$0: Warning: $PYTHON3 $KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP, error code: $status" 1>&2
 	    fi
@@ -626,8 +686,8 @@ if [[ -z $CAP_S_FLAG ]]; then
 	    if [[ $status -ne 0 ]]; then
 		if [[ -z "$F_FLAG" ]]; then
 		    echo "$0: FATAL: chown $USER_GROUP $SORTED_TMP, error code: $status" 1>&2
-		    echo "$0: FATAL: exit 30" 1>&2
-		    exit 30
+		    echo "$0: FATAL: exit 33" 1>&2
+		    exit 33
 		else
 		    echo "$0: Warning: chown $USER_GROUP $SORTED_TMP, error code: $status" 1>&2
 		fi
@@ -642,8 +702,8 @@ if [[ -z $CAP_S_FLAG ]]; then
 	    if [[ $status -ne 0 ]]; then
 		if [[ -z "$F_FLAG" ]]; then
 		    echo "$0: FATAL: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
-		    echo "$0: FATAL: exit 31" 1>&2
-		    exit 31
+		    echo "$0: FATAL: exit 34" 1>&2
+		    exit 34
 		else
 		    echo "$0: Warning: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
 		fi
@@ -658,8 +718,8 @@ if [[ -z $CAP_S_FLAG ]]; then
 	    if [[ $status -ne 0 ]]; then
 		if [[ -z "$F_FLAG" ]]; then
 		    echo "$0: FATAL: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
-		    echo "$0: FATAL: exit 32" 1>&2
-		    exit 32
+		    echo "$0: FATAL: exit 35" 1>&2
+		    exit 35
 		else
 		    echo "$0: Warning: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
 		fi
@@ -805,24 +865,50 @@ if [[ -n "$USER_GROUP" ]]; then
     fi
 fi
 
-# Ensure that critical files have a dated copy
+# Insure that critical files have a dated copy
 #
 if [[ -n "$V_FLAG" ]]; then
-    echo '# Ensure that critical files have a dated copy'
+    echo '# Insure that critical files have a dated copy'
 fi
 for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
 
+    # deal with the case where we have authorized_keys.LOCKED
+    #
+    # When we have authorized_keys.LOCKED we need to form a dated file
+    # as if we have authorized_keys while using the contents of authorized_keys.LOCKED
+    #
+    export src="$file"
+    if [[ $file == "authorized_keys" && -f authorized_keys.LOCKED ]]; then
+	src="authorized_keys.LOCKED"
+
+    # deal with the case where we have id_rsa
+    #
+    # When we have id_rsa.LOCKED we need to form a dated file
+    # as if we have id_rsa while using the contents of id_rsa.LOCKED
+    #
+    elif [[ $file == "id_rsa" && -f id_rsa.LOCKED ]]; then
+	src="id_rsa.LOCKED"
+
+    # deal with the case where we have id_rsa.pub
+    #
+    # When we have id_rsa.pub.LOCKED we need to form a dated file
+    # as if we have id_rsa.pub while using the contents of id_rsa.pub.LOCKED
+    #
+    elif [[ $file == "id_rsa.pub" && -f id_rsa.pub.LOCKED ]]; then
+	src="id_rsa.pub.LOCKED"
+    fi
+
     # catch the case of a missing critical file
     #
-    if [[ ! -f "$file" ]]; then
-	case "$file" in
-	authorized_keys|config|known_hosts)
+    if [[ ! -f "$src" ]]; then
+	case "$src" in
+	authorized_keys|authorized_keys.LOCKED|config|known_hosts)
 	    if [[ -z "$I_FLAG" ]]; then
-		echo "$0: Notice: not a critical problem, but $dir does not have file: $file" 1>&2
+		echo "$0: notice: not a critical problem, but $dir does not have file: $src" 1>&2
 	    fi
 	    ;;
 	*)  if [[ -z "$I_FLAG" ]]; then
-		echo "$0: Warning: $dir is missing important file: $file" 1>&2
+		echo "$0: Warning: $dir is missing important file: $src" 1>&2
 	    fi
 	    ;;
 	esac
@@ -832,29 +918,29 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
     # determine the dated filename
     #
     if [[ "${OS}" == "darwin" || "${OS}" == "macOS" ]]; then
-	date_file="$file."$(ls -Tl "$file" | awk '{if($6~"Jan"){m="01"}else if($6~"Feb"){m="02"}else if($6~"Mar"){m="03"}else if($6~"Apr"){m="04"}else if($6~"May"){m="05"}else if($6~"Jun"){m="06"}else if($6~"Jul"){m="07"}else if($6~"Aug"){m="08"}else if($6~"Sep"){m="09"}else if($6~"Oct"){m="10"}else if($6~"Nov"){m="11"}else if($6~"Dec"){m="12"} else{m="mm"} if($7 < 10) {d="0"$7;} else {d=$7;} print $9 m d "." $8}' | tr -d :)
+	date_file="$file."$(ls -Tl "$src" | awk '{if($6~"Jan"){m="01"}else if($6~"Feb"){m="02"}else if($6~"Mar"){m="03"}else if($6~"Apr"){m="04"}else if($6~"May"){m="05"}else if($6~"Jun"){m="06"}else if($6~"Jul"){m="07"}else if($6~"Aug"){m="08"}else if($6~"Sep"){m="09"}else if($6~"Oct"){m="10"}else if($6~"Nov"){m="11"}else if($6~"Dec"){m="12"} else{m="mm"} if($7 < 10) {d="0"$7;} else {d=$7;} print $9 m d "." $8}' | tr -d :)
     else
-	date_file="$file."$(ls --full-time "$file" | awk '{print $6, $7;}' | sed -e 's/\.[0-9]*$//' -e 's/[:-]//g' -e 's/ /./')
+	date_file="$file."$(ls --full-time "$src" | awk '{print $6, $7;}' | sed -e 's/\.[0-9]*$//' -e 's/[:-]//g' -e 's/ /./')
     fi
     if [[ -z $date_file ]]; then
-	echo "$0: FATAL: cannot determinte date for file: $file" 1>&2
-	echo "$0: FATAL: exit 33" 1>&2
-	exit 33
+	echo "$0: FATAL: cannot determinte date for file: $src" 1>&2
+	echo "$0: FATAL: exit 36" 1>&2
+	exit 36
     fi
 
     # unless the timestamped file is a copy of the original, form it
     #
-    if ! cmp -s "$file" "$date_file"; then
+    if ! cmp -s "$src" "$date_file"; then
 	if [[ -n "$V_FLAG" ]]; then
-	    echo "cp -p $V_FLAG $file $date_file"
+	    echo "cp -p $V_FLAG $src $date_file"
 	fi
 	if [[ -z "$N_FLAG" ]]; then
-	    cp -p $V_FLAG "$file" "$date_file"
+	    cp -p $V_FLAG "$src" "$date_file"
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
-		echo "$0: FATAL: cp -p $V_FLAG $file $date_file, error code: $status" 1>&2
-		echo "$0: FATAL: exit 34" 1>&2
-		exit 34
+		echo "$0: FATAL: cp -p $V_FLAG $src $date_file, error code: $status" 1>&2
+		echo "$0: FATAL: exit 37" 1>&2
+		exit 37
 	    fi
 	fi
     fi
@@ -866,12 +952,39 @@ fi
 # move all but the last dated element of certain files into OLD
 #
 if [[ -n "$V_FLAG" ]]; then
-    echo '# Processing fileset'
+    echo '# Processing fileset moves'
 fi
 for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
-    if [[ ! -f "$file" && -n "$I_FLAG" ]]; then
+
+    # deal with the case where we have authorized_keys.LOCKED
+    #
+    # When we have authorized_keys.LOCKED we need to form a dated file
+    # as if we have authorized_keys while using the contents of authorized_keys.LOCKED
+    #
+    export src="$file"
+    if [[ $file == "authorized_keys" && -f authorized_keys.LOCKED ]]; then
+	src="authorized_keys.LOCKED"
+
+    # deal with the case where we have id_rsa
+    #
+    # When we have id_rsa.LOCKED we need to form a dated file
+    # as if we have id_rsa while using the contents of id_rsa.LOCKED
+    #
+    elif [[ $file == "id_rsa" && -f id_rsa.LOCKED ]]; then
+	src="id_rsa.LOCKED"
+
+    # deal with the case where we have id_rsa.pub
+    #
+    # When we have id_rsa.pub.LOCKED we need to form a dated file
+    # as if we have id_rsa.pub while using the contents of id_rsa.pub.LOCKED
+    #
+    elif [[ $file == "id_rsa.pub" && -f id_rsa.pub.LOCKED ]]; then
+	src="id_rsa.pub.LOCKED"
+    fi
+
+    if [[ ! -f "$src" && -n "$I_FLAG" ]]; then
 	if [[ -n "$V_FLAG" ]]; then
-	    echo "# skipping the processing of: $file"
+	    echo "# skipping the processing of: $src"
 	fi
 	continue
     fi
@@ -934,6 +1047,9 @@ elif [[ -n "$V_FLAG" ]]; then
     fi
 fi
 if [[ -n "$V_FLAG" ]]; then
+    echo
+    echo "# final state of $dir"
+    ls -l
     echo
 fi
 
