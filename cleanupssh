@@ -28,7 +28,7 @@
 
 # parse args
 #
-export VERSION="3.2.8"
+export VERSION="3.2.9"
 export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-c user[:group]] [-V] [-h] dir
 
     -n		Do nothing (def: do)
@@ -932,13 +932,13 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
     #
     if ! cmp -s "$src" "$date_file"; then
 	if [[ -n "$V_FLAG" ]]; then
-	    echo "cp -p $V_FLAG $src $date_file"
+	    echo "cp -f -p $V_FLAG $src $date_file"
 	fi
 	if [[ -z "$N_FLAG" ]]; then
-	    cp -p $V_FLAG "$src" "$date_file"
+	    cp -f -p $V_FLAG "$src" "$date_file"
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
-		echo "$0: FATAL: cp -p $V_FLAG $src $date_file, error code: $status" 1>&2
+		echo "$0: FATAL: cp -f -p $V_FLAG $src $date_file, error code: $status" 1>&2
 		echo "$0: FATAL: exit 37" 1>&2
 		exit 37
 	    fi
@@ -994,13 +994,13 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
       -name "$file"'.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][a-z]' \) |
       sort -r | awk 'NR != 1 {print $0;}' | while read i; do
 	if [[ -z "$N_FLAG" ]]; then
-	    mv $V_FLAG "$i" OLD
+	    mv -f $V_FLAG "$i" OLD
 	    status="$?"
 	    if [[ $status -ne 0 ]]; then
-		echo "$0: Warning: mv $V_FLAG $i OLD, error code: $status" 1>&2
+		echo "$0: Warning: mv -f $V_FLAG $i OLD, error code: $status" 1>&2
 	    fi
 	elif [[ -n "$V_FLAG" ]]; then
-	    echo mv $V_FLAG "$i" OLD
+	    echo mv -f $V_FLAG "$i" OLD
 	fi
     done
 done
@@ -1015,13 +1015,13 @@ if [[ -n "$V_FLAG" ]]; then
 fi
 find . -mindepth 1 -maxdepth 1 -type f \( -name 'from-*' -o -name 'no-*' \) -print | while read i; do
     if [[ -z "$N_FLAG" ]]; then
-	mv $V_FLAG "$i" OLD
+	mv -f $V_FLAG "$i" OLD
 	status="$?"
 	if [[ $status -ne 0 ]]; then
-	    echo "$0: Warning: mv $V_FLAG $i OLD, error code: $status" 1>&2
+	    echo "$0: Warning: mv -f $V_FLAG $i OLD, error code: $status" 1>&2
 	fi
     elif [[ -n "$V_FLAG" ]]; then
-	echo mv $V_FLAG "$i" OLD
+	echo mv -f $V_FLAG "$i" OLD
     fi
 done
 if [[ -n "$V_FLAG" ]]; then
