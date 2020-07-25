@@ -28,7 +28,7 @@
 
 # parse args
 #
-export VERSION="3.3.0"
+export VERSION="3.3.1"
 export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-C] [-c user[:group]] [-V] [-h] dir
 
     -n		Do nothing (def: do)
@@ -797,7 +797,7 @@ if [[ -z $N_FLAG ]]; then
     SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print)
     if [[ -n $SET ]]; then
         find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
-            xargs $XARGS_V -0 chmod $V_FLAG 0664
+            xargs $XARGS_V -0 chmod $V_FLAG 0600
     fi
 elif [[ -n $V_FLAG ]]; then
     echo chmod $V_FLAG 0700 .
@@ -824,7 +824,7 @@ elif [[ -n $V_FLAG ]]; then
     SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print)
     if [[ -n $SET ]]; then
         find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
-            xargs -0 echo chmod $V_FLAG 0664
+            xargs -0 echo chmod $V_FLAG 0600
     fi
 fi 2>&1 | grep -v ' retained as '
 if [[ -n $V_FLAG ]]; then
