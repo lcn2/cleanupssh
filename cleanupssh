@@ -28,8 +28,9 @@
 
 # parse args
 #
-export VERSION="3.3.1"
-export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-C] [-c user[:group]] [-V] [-h] dir
+export VERSION="3.3.2"
+export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-C] [-d] [-p khc_path]
+			[-P python3] [-2 sha256_path] [-c user[:group]] [-V] [-h] dir
 
     -n		Do nothing (def: do)
     -v		Verbose mode (def: quiet)
@@ -43,13 +44,15 @@ export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-C] [-c user[:group]
 		    NOTE: if authorized_keys.LOCKED exists, authorized_keys is not touched
     -s		Do not unique sort and cleanup authorized_keys (def: do)
     -S		Do not unique sort and cleanup known_hosts (def: do with known_hosts_cleanup)
-    -C		Do not clean up ~ files AND
-		do not clean up nfs files AND
-		do not clean up OLD *.Mon files AND
-		do not rename OLD yymmdd.hhmms files to 20yymmdd.hhmmss (def: do)
+    -C		Do not clean up nfs files AND
+		    do not clean up OLD *.Mon files AND
+		    do not rename OLD yymmdd.hhmms files to 20yymmdd.hhmmss AND
+		    do not rename OLD yymmdd files to 20yymmdd (def: do)
+    -d		Do not remove duplicate files under the from and OLD sub-directories (def: no)
 
-    -p khc_path	Absolute path to known_hosts_cleanup (def: search for known_hosts_cleanup)
-    -P python3	Absolute path to python3 (def: search for python3)
+    -p khc_path		Absolute path to known_hosts_cleanup (def: search for known_hosts_cleanup)
+    -P python3		Absolute path to python3 (def: search for python3)
+    -2 sha256_path 	Absolute path to sha256sum (def: /usr/bin/sha256sum)
 
     -c user[:group]	Chown critical files as user:group (def: do not chown)
 			    NOTE: Ignored if UID != 0 (i.e., not root)
@@ -69,10 +72,12 @@ export T_FLAG=
 export S_FLAG=
 export CAP_S_FLAG=
 export CAP_C_FLAG=
+export D_FLAG=
 export USER_GROUP=
 export KNOWN_HOSTS_CLEANUP=
 export PYTHON3=
-while getopts hnvfitsSCp:P:c:V flag; do
+export SHA256SUM_PROG=/usr/bin/sha256sum
+while getopts hnvfitsSCdp:P:2:c:V flag; do
     case "$flag" in
     h)
         echo "$USAGE" 1>&2
@@ -92,8 +97,10 @@ while getopts hnvfitsSCp:P:c:V flag; do
     s) S_FLAG="-s" ;;
     S) CAP_S_FLAG="-S" ;;
     C) CAP_C_FLAG="-C" ;;
+    d) D_FLAG="-d" ;;
     p) KNOWN_HOSTS_CLEANUP="$OPTARG" ;;
     P) PYTHON3="$OPTARG" ;;
+    2) SHA256SUM_PROG="$OPTARG" ;;
     c) USER_GROUP="$OPTARG" ;;
     V)
         echo "$0: Version: $VERSION"
@@ -129,6 +136,23 @@ if [[ -n $USER_GROUP ]]; then
         fi
         USER_GROUP=
     fi
+fi
+if [[ -z $D_FLAG ]]; then
+    if [[ -x $SHA256SUM_PROG ]]; then
+	if [[ -n $V_FLAG ]]; then
+	    echo "# sha256sum excutable: $SHA256SUM_PROG" 1>&2
+	fi
+    else
+	if [[ -n $V_FLAG ]]; then
+	    echo "# Warning: sha256sum is not excutable, will not use: $SHA256SUM_PROG" 1>&2
+	fi
+	SHA256SUM_PROG=
+    fi
+else
+    if [[ -n $V_FLAG ]]; then
+	echo "# use of sha256sum excutable disabled by -d: $SHA256SUM_PROG" 1>&2
+    fi
+    SHA256SUM_PROG=
 fi
 if [[ -n $V_FLAG ]]; then
     echo "# cleanupssh version: $VERSION"
@@ -1103,30 +1127,6 @@ if [[ -z $CAP_C_FLAG ]]; then
     fi
 fi
 
-# remove ~ files
-#
-if [[ -z $CAP_C_FLAG ]]; then
-    if [[ -n $V_FLAG ]]; then
-        echo "# remove ~ files from $dir"
-    fi
-    if [[ -z $N_FLAG ]]; then
-        if [[ -n $V_FLAG ]]; then
-            echo '# listing files that are being removed'
-            find . -type f \( -name '*~' -o -name '~*' \) -print -delete 2>/dev/null
-        else
-            find . -type f \( -name '*~' -o -name '~*' \) -delete 2>/dev/null
-        fi
-    else
-        if [[ -n $V_FLAG ]]; then
-            echo '# listing files that would be removed but for use of -n'
-            find . -type f \( -name '*~' -o -name '~*' \) -print 2>/dev/null
-        fi
-    fi
-    if [[ -n $V_FLAG ]]; then
-        echo
-    fi
-fi
-
 # remove OLD files of the form *.Mon
 #
 if [[ -z $CAP_C_FLAG ]]; then
@@ -1170,34 +1170,117 @@ if [[ -z $CAP_C_FLAG ]]; then
         if [[ -n $V_FLAG ]]; then
             echo '# listing files that are being renamed'
         fi
-        find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][^C9][0-9][0-9][0-9][0-9]' -print 2>/dev/null |
+        find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]' -print 2>/dev/null |
             while read -r i; do
                 if [[ -n $V_FLAG ]]; then
                     # SC2001: See if you can use ${variable//search/replace} instead.
                     # shellcheck disable=SC2001
                     echo mv -f -v "$i" "$(echo "$i" |
-                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][^C9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
+                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
                 fi
                 # SC2001: See if you can use ${variable//search/replace} instead.
                 # shellcheck disable=SC2001
                 mv -f "$i" "$(echo "$i" |
-                    sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][^C9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
+                    sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
             done
     else
         if [[ -n $V_FLAG ]]; then
             echo '# listing mv commands that would be performed but for use of -n'
-            find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][^C9][0-9][0-9][0-9][0-9]' -print 2>/dev/null |
+            find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]' -print 2>/dev/null |
                 while read -r i; do
                     # SC2001: See if you can use ${variable//search/replace} instead.
                     # shellcheck disable=SC2001
                     echo mv -f -v "$i" "$(echo "$i" |
-                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][^C9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
+                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
                 done
         fi
     fi
     if [[ -n $V_FLAG ]]; then
         echo
     fi
+fi
+
+# rename OLD *.yymmdd files to *.20yymmdd
+#
+if [[ -z $CAP_C_FLAG ]]; then
+    if [[ -n $V_FLAG ]]; then
+        echo "# rename OLD *.yymmdd files to *.20yymmdd"
+    fi
+    if [[ -z $N_FLAG ]]; then
+        if [[ -n $V_FLAG ]]; then
+            echo '# listing files that are being renamed'
+        fi
+        find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]$' -print 2>/dev/null |
+            while read -r i; do
+                if [[ -n $V_FLAG ]]; then
+                    # SC2001: See if you can use ${variable//search/replace} instead.
+                    # shellcheck disable=SC2001
+                    echo mv -f -v "$i" "$(echo "$i" |
+                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
+                fi
+                # SC2001: See if you can use ${variable//search/replace} instead.
+                # shellcheck disable=SC2001
+                mv -f "$i" "$(echo "$i" |
+                    sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
+            done
+    else
+        if [[ -n $V_FLAG ]]; then
+            echo '# listing mv commands that would be performed but for use of -n'
+            find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]$' -print 2>/dev/null |
+                while read -r i; do
+                    # SC2001: See if you can use ${variable//search/replace} instead.
+                    # shellcheck disable=SC2001
+                    echo mv -f -v "$i" "$(echo "$i" |
+                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
+                done
+        fi
+    fi
+    if [[ -n $V_FLAG ]]; then
+        echo
+    fi
+fi
+
+# remove selective duplicate files from certain sub-directories
+#
+# Where a sub-directory contains files with duplicate contents,
+# we remove all but one of those duplicates.
+#
+if [[ -z $D_FLAG && -n $SHA256SUM_PROG ]]; then
+    for dir in OLD from; do
+	if [[ -n $V_FLAG ]]; then
+	    echo "# remove selective duplicate files under $dir"
+	fi
+	RM_SET=$(find "$dir" -type f -print0 2>/dev/null | xargs -0 "$SHA256SUM_PROG" -- 2>/dev/null | sort |
+		    awk 'NF==2 && $2!="-" {if ($1 == prev) {for (i=2;i<=NF;i++) {print $i;}} prev=$1;}')
+	if [[ -n $RM_SET ]]; then
+	    if [[ -n $V_FLAG ]]; then
+		echo "# these duplicate files under $dir may be removed:"
+		echo "$RM_SET"
+	    fi
+	    # safe removal that takes care of files with newlines, and other whitespace
+	    if [[ -z $N_FLAG ]]; then
+		if [[ -n $V_FLAG ]]; then
+		    echo "# removing duplicate files under $dir:"
+		    find "$dir" -type f -print0 2>/dev/null | xargs -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
+			awk '{print $NF, $0}' | sort |
+			awk '$2~"SHA256" && $NF-1!="-" {if ($NF == prev) {for (i=3;i<NF-1;i++) {printf("%s ",$i);}printf("\n");} prev=$NF;}' |
+			sed -e 's/^(//' -e 's/) $//' | tr '\012' '\000' | sed -e 's/\\n/\n/' | xargs -0 -n 1 rm -f -v
+		else
+		    find "$dir" -type f -print0 2>/dev/null | xargs -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
+			awk '{print $NF, $0}' | sort |
+			awk '$2~"SHA256" && $NF-1!="-" {if ($NF == prev) {for (i=3;i<NF-1;i++) {printf("%s ",$i);}printf("\n");} prev=$NF;}' |
+			sed -e 's/^(//' -e 's/) $//' | tr '\012' '\000' | sed -e 's/\\n/\n/' | xargs -0 -n 1 rm -f
+		fi
+	    fi
+	else
+	    if [[ -n $V_FLAG ]]; then
+		echo "# no duplicate files under $dir need to be removed"
+	    fi
+	fi
+	if [[ -n $V_FLAG ]]; then
+	    echo
+	fi
+    done
 fi
 
 # All Done!!! -- Jessica Noll, Age 2
