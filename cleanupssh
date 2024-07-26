@@ -2,7 +2,7 @@
 #
 # cleanupssh - cleanup a .ssh directory
 #
-# Copyright (c) 2015-2020 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2015-2020,2024 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
@@ -28,7 +28,7 @@
 
 # parse args
 #
-export VERSION="3.3.2"
+export VERSION="3.3.3"
 export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-C] [-d] [-p khc_path]
 			[-P python3] [-2 sha256_path] [-c user[:group]] [-V] [-h] dir
 
