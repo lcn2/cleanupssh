@@ -77,4 +77,4 @@ rm -rf RMME
 
 ## Reporting Security Issues
 
-To report a security issue, please visit "[Reporting Security Issues](security/policy)".
+To report a security issue, please visit "[Reporting Security Issues](security/policy/SECURITY.md)".
