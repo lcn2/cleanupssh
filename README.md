@@ -73,3 +73,8 @@ rm -rf RMME
 
 /usr/local/sbin/cleanupssh version: 3.4.0 2025-03-16
 ```
+
+
+## Reporting Security Issues
+
+To report a security issue, please visit "[Reporting Security Issues](security/policy)".
