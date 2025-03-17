@@ -1,54 +1,55 @@
-#!/usr/bin/python3
-# encoding: utf-8
-#
-# known_hosts_cleanup - cleanup known_hosts and output in canonical order
-#
-# We will combine known_hosts lines so that each ssh fingerprint is found once
-# and so that the hosts for the ssh fingerprint are listed in a canonoical order
-# and so that the lines are sorted by the 1st canonical host + key type.
-#
-# Copyright (c) 2019 by Landon Curt Noll.  All Rights Reserved.
-#
-# Permission to use, copy, modify, and distribute this software and
-# its documentation for any purpose and without fee is hereby granted,
-# provided that the above copyright, this permission notice and text
-# this comment, and the disclaimer below appear in all of the following:
-#
-#       supporting documentation
-#       source copies
-#       source works derived from this source
-#       binaries derived from this source or from derived source
-#
-# LANDON CURT NOLL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
-# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO
-# EVENT SHALL LANDON CURT NOLL BE LIABLE FOR ANY SPECIAL, INDIRECT OR
-# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF
-# USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-# OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-# PERFORMANCE OF THIS SOFTWARE.
-#
-# chongo (Landon Curt Noll, http://www.isthe.com/chongo/index.html) /\oo/\
-#
-# Share and enjoy! :-)
+#!/usr/bin/env python
+'''
+    known_hosts_cleanup - cleanup known_hosts and output in canonical order
 
-import collections
+    We will combine known_hosts lines so that each ssh fingerprint is found once
+    and so that the hosts for the ssh fingerprint are listed in a canonical order
+    and so that the lines are sorted by the 1st canonical host + key type.
+
+    Copyright (c) 2019,2025 by Landon Curt Noll.  All Rights Reserved.
+
+    Permission to use, copy, modify, and distribute this software and
+    its documentation for any purpose and without fee is hereby granted,
+    provided that the above copyright, this permission notice and text
+    this comment, and the disclaimer below appear in all of the following:
+
+          supporting documentation
+          source copies
+          source works derived from this source
+          binaries derived from this source or from derived source
+
+    LANDON CURT NOLL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+    INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO
+    EVENT SHALL LANDON CURT NOLL BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+    CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF
+    USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+    OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+    PERFORMANCE OF THIS SOFTWARE.
+
+    chongo (Landon Curt Noll) ^oo^
+
+    http://www.isthe.com/chongo/index.html
+    https://github.com/lcn2
+
+    Share and enjoy!
+'''
+
 import re
 import sys
-import os
 import ipaddress
 from collections import defaultdict
 import argparse
 
 # setup
 #
-version = '3.2.7'
+VERSION = '3.3.0 2025-03-16'
 
 # parse args
 #
 parser = argparse.ArgumentParser(
         prog='known_hosts_cleanup',
         description='cleanup an ssh known_hosts file',
-        epilog='version: '+version)
+        epilog='version: {VERSION}')
 parser.add_argument('-v', '--verbose',
         help='verbose messages to stderr (def: just Warnings to stderr)',
         dest='verbose',
@@ -56,16 +57,20 @@ parser.add_argument('-v', '--verbose',
 parser.add_argument('known_hosts',
         help='the ssh known_hosts file')
 args = parser.parse_args()
-if (args.verbose):
-    print('# known_hosts_cleanup version: '+version, file=sys.stderr)
+if args.verbose:
+    print('# known_hosts_cleanup version: {VERSION}', file=sys.stderr)
     print('# about write to stdout, a cleaned version of:', args.known_hosts, file=sys.stderr)
+
 
 # wrapper for old comparison function
 #
 def cmp_to_key(mycmp):
     'Convert a cmp= function into a key= function'
     class K:
-        def __init__(self, obj, *args):
+        '''
+        comparison class
+        '''
+        def __init__(self, obj):
             self.obj = obj
         def __lt__(self, other):
             return mycmp(self.obj, other.obj) < 0
@@ -81,27 +86,31 @@ def cmp_to_key(mycmp):
             return mycmp(self.obj, other.obj) != 0
     return K
 
+
 # check if IPv4 address
 #
 def is_ipv4(a):
-    'Return parseed IPv4 address or None if not an IPv4 address'
+    'Return parsed IPv4 address or None if not an IPv4 address'
     try:
         return ipaddress.IPv4Address(a)
     except ValueError:
         return None
     return None
 
+
 # check if IPv6 address
 #
 def is_ipv6(a):
-    'Return parseed IPv6 address or None if not an IPv6 address'
+    'Return parsed IPv6 address or None if not an IPv6 address'
     try:
         return ipaddress.IPv6Address(a)
     except ValueError:
         return None
     return None
 
+
 host_port_re = re.compile(r"^\[(.+)\]:([0-9]+)$")
+
 
 # determine if an arg is of the form [host_or_ip]:port
 #
@@ -118,6 +127,11 @@ def is_host_port(a):
     # assert:
     return [match.group(1), match.group(2)]
 
+
+# pylint: disable=too-many-locals
+# pylint: disable=too-many-return-statements
+# pylint: disable=too-many-branches
+#
 # special hostname, IP address, and [host_or_ip]:port comparison function
 #
 def hostname_order(a, b):
@@ -127,12 +141,12 @@ def hostname_order(a, b):
         [host_or_address]:port are sorted on host_or_address and then port order
           thus [ahost]:80 is grater than [bhost]:443
           thus [foo]:443 is grater than [foo]:80
-        two IPv6 adresses are compared in IPv6 address space order
+        two IPv6 addresses are compared in IPv6 address space order
         valid IPv6 addresses are greater than hostnames
           thus 0:0:0:0:0:0:0:1 is greater localhost
         valid IPv6 addresses are greater IPv4 addresses
           thus 0:0:0:0:0:0:0:1 is greater 127.0.0.1
-        two IPv4 adresses are compared in IPv4 address space order
+        two IPv4 addresses are compared in IPv4 address space order
         valid IPv4 addresses are greater than hostnames
           thus 127.0.0.1 is greater than localhost
         hostnames with more sub-domains levels are greater
@@ -175,24 +189,20 @@ def hostname_order(a, b):
                 # compare port numbers
                 if a_port < b_port:
                     return -1
-                elif a_port > b_port:
+                if a_port > b_port:
                     return 1
-                else:
-                    return 0
+                return 0
 
-            else:
+            # assert: host_or_ip of a does NOT match host_or_ip of b
 
-                # assert: host_or_ip of a does NOT match host_or_ip of b
-
-                # return comparison of host_or_ip of a vs. host_or_ip of b
-                return host_cmp
+            # return comparison of host_or_ip of a vs. host_or_ip of b
+            return host_cmp
 
         # [host_or_ip]:port form is greater than anyhost_or_ip_adr
-        else:
 
-            # assert: b is NOT in [host_or_ip]:port form
+        # assert: b is NOT in [host_or_ip]:port form
 
-            return 1
+        return 1
 
     # assert: a is NOT in [host_or_ip]:port form
 
@@ -206,7 +216,7 @@ def hostname_order(a, b):
 
     # assert: b is NOT in [host_or_ip]:port form
 
-    # determine if args are IPv6 addreses
+    # determine if args are IPv6 addresses
     a_ipv6 = is_ipv6(a)
     b_ipv6 = is_ipv6(b)
 
@@ -222,10 +232,9 @@ def hostname_order(a, b):
             # sort based on IPv6 addresses
             if a_ipv6 < b_ipv6:
                 return -1
-            elif a_ipv6 > b_ipv6:
+            if a_ipv6 > b_ipv6:
                 return 1
-            else:
-                return 0
+            return 0
 
         # IPv6 is greater than IPv4 and hostnames
         return 1
@@ -243,7 +252,7 @@ def hostname_order(a, b):
 
     # assert: b is NOT IPv6
 
-    # determine if args are IPv4 addreses
+    # determine if args are IPv4 addresses
     a_ipv4 = is_ipv4(a)
     b_ipv4 = is_ipv4(b)
 
@@ -259,10 +268,9 @@ def hostname_order(a, b):
             # sort based on IPv4 addresses
             if a_ipv4 < b_ipv4:
                 return -1
-            elif a_ipv4 > b_ipv4:
+            if a_ipv4 > b_ipv4:
                 return 1
-            else:
-                return 0
+            return 0
 
         # IPv4 is greater than hostnames
         return 1
@@ -287,8 +295,8 @@ def hostname_order(a, b):
     # compare if a and b have different number of sub-domain levels
     if domain_levels_a < domain_levels_b:
         return -1
-    elif domain_levels_a > domain_levels_b:
-       return 1
+    if domain_levels_a > domain_levels_b:
+        return 1
 
     # assert: args have the same number of sub-domain levels
 
@@ -298,40 +306,46 @@ def hostname_order(a, b):
 
     # compare hostnames based lower case from the lowest sub-domain up
     if a_domains < b_domains:
-       return -1
-    elif a_domains > b_domains:
-       return 1
-    else:
-       return 0
+        return -1
+    if a_domains > b_domains:
+        return 1
+    return 0
+#
+# pylint: enable=too-many-locals
+# pylint: enable=too-many-return-statements
+# pylint: enable=too-many-branches
+
 
 # read known hosts to memory
 #
-with open(args.known_hosts) as f:
-    known_hosts = dict()
-    line_number = 0
+with open(args.known_hosts, encoding='utf-8') as f:
+    known_hosts = {}
+    LINE_NUMBER = 0
     for line in f:
-        line_number += 1
+        LINE_NUMBER += 1
         if line.strip() == "":
-            print('Warning: file:', args.known_hosts, 'skipping line', line_number,
+            print('Warning: file:', args.known_hosts, 'skipping line', LINE_NUMBER,
                   'empty line', file=sys.stderr)
             continue
         if line.strip().startswith("#"):
-            print('Warning: file:', args.known_hosts, 'skipping line', line_number,
+            print('Warning: file:', args.known_hosts, 'skipping line', LINE_NUMBER,
                   '#comment line', file=sys.stderr)
             continue
         line_args = len(line.split(" "))
         if line_args != 3:
-            print('Warning: file:', args.known_hosts, 'skipping line', line_number,
+            print('Warning: file:', args.known_hosts, 'skipping line', LINE_NUMBER,
                   'expected 3 args, found', line_args, file=sys.stderr)
             continue
         hosts, keytype, fingerprint = line.strip().split(" ")
-        dictkey = keytype + '@' + fingerprint
+        DICTKEY = f'{keytype}@{fingerprint}'
         hosts = hosts.split(",")
-        if known_hosts.get(dictkey) == None:
-            known_hosts[dictkey] = dict(hosts=set(),
+        if not known_hosts.get(DICTKEY):
+            # pylint: disable-next=use-dict-literal
+            known_hosts[DICTKEY] = dict(hosts=set(),
                                         keytype=keytype,
                                         fingerprint=fingerprint)
-        known_hosts[dictkey]['hosts'].update(hosts)
+        known_hosts[DICTKEY]['hosts'].update(hosts)
+
 
 # form the host_joined_sorted elements in the hostname_order canonical order
 # also record the 1st host in the host_joined_sorted list
@@ -340,23 +354,29 @@ for key, known_host in known_hosts.items():
     line_hosts = sorted(known_host['hosts'], key=cmp_to_key(hostname_order))
     known_host['first_host'] = line_hosts[0]
     known_host['host_joined_sorted'] = ",".join(line_hosts)
-    known_host['line'] = known_host['host_joined_sorted'] + ' ' + known_host['keytype'] + ' ' + known_host['fingerprint']
+    known_host['line'] = (f'{known_host["host_joined_sorted"]} '
+                          f'{known_host["keytype"]} '
+                          f'{known_host["fingerprint"]}')
 
-# build the canonical_known_hosts dictionary, keyed by first_host@keytype with known_hosts line values
+
+# build the canonical_known_hosts dictionary, keyed by
+# first_host@keytype with known_hosts line values
 #
 canonical_known_hosts = defaultdict()
 for key, known_host in known_hosts.items():
-    new_known_host_key = known_host['first_host'] + '@' + known_host['keytype']
-    canonical_known_hosts[new_known_host_key] = known_host['line']
+    NEW_KNOWN_HOST_KEY = f'{known_host["first_host"]}@{known_host["keytype"]}'
+    canonical_known_hosts[NEW_KNOWN_HOST_KEY] = known_host['line']
+
 
 # output a canonical version of known_hosts
 #
 for key, known_host_line in sorted(canonical_known_hosts.items()):
     print(known_host_line)
 
+
 # verbose output of actions
 #
-if (args.verbose):
+if args.verbose:
     print('# wrote to stdout, a cleaned up version of:', args.known_hosts, file=sys.stderr)
-    print('# line count of orignal', args.known_hosts, 'is:', line_number, file=sys.stderr);
+    print('# line count of original', args.known_hosts, 'is:', LINE_NUMBER, file=sys.stderr)
     print('# line count of the new', args.known_hosts, 'is:', len(known_hosts), file=sys.stderr)

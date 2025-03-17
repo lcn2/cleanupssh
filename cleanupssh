@@ -2,7 +2,7 @@
 #
 # cleanupssh - cleanup a .ssh directory
 #
-# Copyright (c) 2015-2020,2024 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2015-2020,2023-2025 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
@@ -11,7 +11,7 @@
 #
 #       supporting documentation
 #       source copies
-#       source works derived rom this source
+#       source works derived from this source
 #       binaries derived from this source or from derived source
 #
 # LANDON CURT NOLL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
@@ -22,13 +22,38 @@
 # OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 #
-# chongo (Landon Curt Noll, http://www.isthe.com/chongo/index.html) /\oo/\
+# chongo (Landon Curt Noll) /\oo/\
 #
-# Share and enjoy! :-)
+# http://www.isthe.com/chongo/index.html
+# https://github.com/lcn2
+#
+# Share and enjoy!
+
+
+# setup
+#
+export VERSION="3.4.0 2025-03-16"
+PYTHON3_PROG=$(type -P python3)
+export PYTHON3_PROG
+SHA256SUM_PROG=$(type -P sha256sum)
+export SHA256SUM_PROG
+KNOWN_HOSTS_CLEANUP=$(type -P known_hosts_cleanup)
+export KNOWN_HOSTS_CLEANUP
+#
+export N_FLAG=
+export V_FLAG=
+export F_FLAG=
+export I_FLAG=
+export T_FLAG=
+export S_FLAG=
+export CAP_S_FLAG=
+export CAP_C_FLAG=
+export D_FLAG=
+export USER_GROUP=
+
 
 # parse args
 #
-export VERSION="3.3.3"
 export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-C] [-d] [-p khc_path]
 			[-P python3] [-2 sha256_path] [-c user[:group]] [-V] [-h] dir
 
@@ -50,47 +75,29 @@ export USAGE="usage: $0 [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-C] [-d] [-p khc_pat
 		    do not rename OLD yymmdd files to 20yymmdd (def: do)
     -d		Do not remove duplicate files under the from and OLD sub-directories (def: no)
 
-    -p khc_path		Absolute path to known_hosts_cleanup (def: search for known_hosts_cleanup)
-    -P python3		Absolute path to python3 (def: search for python3)
-    -2 sha256_path 	Absolute path to sha256sum (def: /usr/bin/sha256sum)
+    -p khc_path		Absolute path to known_hosts_cleanup (def: $KNOWN_HOSTS_CLEANUP)
+    -P python3		Absolute path to python3 (def: search for $PYTHON3_PROG)
+    -2 sha256_path	Absolute path to sha256sum (def: $SHA256SUM_PROG)
 
     -c user[:group]	Chown critical files as user:group (def: do not chown)
 			    NOTE: Ignored if UID != 0 (i.e., not root)
 
     -V		Print version and exit
-    -h		Print this mdssage and exit
+    -h		Print this messages and exit
 
     dir		The .ssh directory to clean up
 
-    Version: $VERSION"
-export N_FLAG=
-export V_FLAG=
-export XARGS_V=
-export F_FLAG=
-export I_FLAG=
-export T_FLAG=
-export S_FLAG=
-export CAP_S_FLAG=
-export CAP_C_FLAG=
-export D_FLAG=
-export USER_GROUP=
-export KNOWN_HOSTS_CLEANUP=
-export PYTHON3=
-export SHA256SUM_PROG=/usr/bin/sha256sum
+$0 version: $VERSION"
 while getopts hnvfitsSCdp:P:2:c:V flag; do
     case "$flag" in
-    h)
-        echo "$USAGE" 1>&2
+    h) echo "$USAGE" 1>&2
         exit 0
         ;;
     n) N_FLAG="-n" ;;
-    v)
-        V_FLAG="-v"
-        XARGS_V="-t"
+    v) V_FLAG="-v"
         ;;
     f) F_FLAG="-f" ;;
-    i)
-        I_FLAG="-i"
+    i) I_FLAG="-i"
         F_FLAG="-f"
         ;;
     t) T_FLAG="-t" ;;
@@ -99,18 +106,27 @@ while getopts hnvfitsSCdp:P:2:c:V flag; do
     C) CAP_C_FLAG="-C" ;;
     d) D_FLAG="-d" ;;
     p) KNOWN_HOSTS_CLEANUP="$OPTARG" ;;
-    P) PYTHON3="$OPTARG" ;;
+    P) PYTHON3_PROG="$OPTARG" ;;
     2) SHA256SUM_PROG="$OPTARG" ;;
     c) USER_GROUP="$OPTARG" ;;
     V)
         echo "$0: Version: $VERSION"
         exit 0
         ;;
-    ?)
-        echo "$0: FATAL: unknown or invalid -flag" 1>&2
+    \?) echo "$0: ERROR: invalid option: -$OPTARG" 1>&2
+        echo 1>&2
         echo "$USAGE" 1>&2
-        echo "$0: FATAL: exit 1" 1>&2
-        exit 1
+        exit 3
+        ;;
+    :) echo "$0: ERROR: option -$OPTARG requires an argument" 1>&2
+        echo 1>&2
+        echo "$USAGE" 1>&2
+        exit 3
+        ;;
+    *) echo "$0: ERROR: unexpected value from getopts: $flag" 1>&2
+        echo 1>&2
+        echo "$USAGE" 1>&2
+        exit 3
         ;;
     esac
 done
@@ -128,7 +144,7 @@ fi
 if [[ -n $USER_GROUP ]]; then
     if [[ -z $UID ]]; then
         export UID
-        UID="$(/usr/bin/id -u)"
+        UID="$(id -u)"
     fi
     if [[ $UID -ne 0 ]]; then
         if [[ -z $I_FLAG ]]; then
@@ -139,18 +155,18 @@ if [[ -n $USER_GROUP ]]; then
 fi
 if [[ -z $D_FLAG ]]; then
     if [[ -x $SHA256SUM_PROG ]]; then
-	if [[ -n $V_FLAG ]]; then
-	    echo "# sha256sum excutable: $SHA256SUM_PROG" 1>&2
-	fi
+        if [[ -n $V_FLAG ]]; then
+            echo "# sha256sum executable: $SHA256SUM_PROG" 1>&2
+        fi
     else
-	if [[ -n $V_FLAG ]]; then
-	    echo "# Warning: sha256sum is not excutable, will not use: $SHA256SUM_PROG" 1>&2
-	fi
-	SHA256SUM_PROG=
+        if [[ -n $V_FLAG ]]; then
+            echo "# Warning: sha256sum is not executable, will not use: $SHA256SUM_PROG" 1>&2
+        fi
+        SHA256SUM_PROG=
     fi
 else
     if [[ -n $V_FLAG ]]; then
-	echo "# use of sha256sum excutable disabled by -d: $SHA256SUM_PROG" 1>&2
+        echo "# use of sha256sum executable disabled by -d: $SHA256SUM_PROG" 1>&2
     fi
     SHA256SUM_PROG=
 fi
@@ -159,8 +175,8 @@ if [[ -n $V_FLAG ]]; then
     if [[ -n $KNOWN_HOSTS_CLEANUP ]]; then
         echo "# -p set known_hosts_cleanup path to: $KNOWN_HOSTS_CLEANUP"
     fi
-    if [[ -n $PYTHON3 ]]; then
-        echo "# -P set python3 path to: $PYTHON3"
+    if [[ -n $PYTHON3_PROG ]]; then
+        echo "# -P set python3 path to: $PYTHON3_PROG"
     fi
 fi
 
@@ -246,32 +262,12 @@ fi
 # look for known_hosts_cleanup tool
 #
 if [[ -z $CAP_S_FLAG ]]; then
-    if [[ -z $KNOWN_HOSTS_CLEANUP ]]; then
-        KNOWN_HOSTS_CLEANUP=$(which known_hosts_cleanup 2>/dev/null)
-        status="$?"
-        if [[ $status -ne 0 || ! -x $KNOWN_HOSTS_CLEANUP ]]; then
-            # try the installed location of known_hosts_cleanup
-            KNOWN_HOSTS_CLEANUP="/usr/global/sbin/known_hosts_cleanup"
-        fi
-    fi
     if [[ ! -x $KNOWN_HOSTS_CLEANUP ]]; then
-        # try the other installed location of known_hosts_cleanup
-        KNOWN_HOSTS_CLEANUP="$HOME/dot/tool/known_hosts_cleanup"
-        if [[ ! -x $KNOWN_HOSTS_CLEANUP ]]; then
-            KNOWN_HOSTS_CLEANUP="$HOME/bin/known_hosts_cleanup"
-            if [[ ! -x $KNOWN_HOSTS_CLEANUP ]]; then
-                # no known_hosts_cleanup is available
-                KNOWN_HOSTS_CLEANUP=
-                echo "$0: Warning: cannot find known_hosts_cleanup, will just sort known_hosts" 1>&2
-                CAP_S_FLAG='-S'
-                echo "$0: Warning: forcing -S to disable known_hosts_cleanup" 1>&2
-            fi
-        else
-            if [[ -n $V_FLAG ]]; then
-                echo
-                echo "# will use alternate known_hosts_cleanup from: $KNOWN_HOSTS_CLEANUP"
-            fi
-        fi
+        # no known_hosts_cleanup is available
+        KNOWN_HOSTS_CLEANUP=
+        echo "$0: Warning: cannot find known_hosts_cleanup, will just sort known_hosts" 1>&2
+        CAP_S_FLAG='-S'
+        echo "$0: Warning: forcing -S to disable known_hosts_cleanup" 1>&2
     else
         if [[ -n $V_FLAG ]]; then
             echo "# will use known_hosts_cleanup from: $KNOWN_HOSTS_CLEANUP"
@@ -284,47 +280,6 @@ else
     fi
 fi
 
-# look for python3
-#
-export PYTHON3_VERSION
-if [[ -z $CAP_S_FLAG ]]; then
-    if [[ -z $PYTHON3 || ! -x $PYTHON3 ]]; then
-        if [[ -x /usr/bin/python3 ]]; then
-            PYTHON3="/usr/bin/python3"
-        elif [[ -x /Library/Frameworks/Python.framework/Versions/3.7/bin/python3 ]]; then
-            PYTHON3="/Library/Frameworks/Python.framework/Versions/3.7/bin/python3"
-        elif [[ -x /bin/python3 ]]; then
-            PYTHON3="/bin/python3"
-        elif [[ -x /usr/local/bin/python3 ]]; then
-            PYTHON3="/usr/local/bin/python3"
-        elif [[ -x /usr/global/bin/python3 ]]; then
-            PYTHON3="/usr/global/bin/python3"
-        else
-            PYTHON3=$(which python3 2>/dev/null)
-        fi
-    fi
-    if [[ -z $PYTHON3 ]]; then
-        echo "$0: Warning: cannot find python3 executable" 1>&2
-        echo "$0: Warning: forcing -S to disable known_hosts_cleanup" 1>&2
-        CAP_S_FLAG="-S"
-    else
-        if [[ -n $V_FLAG ]]; then
-            echo
-            echo "# testing version of python3 using: $PYTHON3 -V 2>/dev/null"
-        fi
-        PYTHON3_VERSION=$("$PYTHON3" -V 2>/dev/null)
-        status="$?"
-        if [[ $status -ne 0 || -z $PYTHON3_VERSION ]]; then
-            echo "$0: Warning: cannot determine version of python3: $PYTHON3" 1>&2
-            echo "$0: Warning: python3 -V, error code: $status" 1>&2
-            echo "$0: Warning: forcing -S to disable known_hosts_cleanup" 1>&2
-            CAP_S_FLAG="-S"
-        elif [[ -n $V_FLAG ]]; then
-            echo "# python3 version: $PYTHON3_VERSION"
-        fi
-    fi
-fi
-
 # form missing critical directories
 #
 if [[ -n $V_FLAG ]]; then
@@ -333,27 +288,37 @@ if [[ -n $V_FLAG ]]; then
 fi
 if [[ ! -d sock ]]; then
     if [[ -z $N_FLAG ]]; then
-        mkdir $V_FLAG sock
-        status="$?"
+	if [[ -n $V_FLAG ]]; then
+	    mkdir -p -v sock
+	    status="$?"
+	else
+	    mkdir -p sock
+	    status="$?"
+	fi
         if [[ ! -d sock ]]; then
             echo "$0: FATAL cannot mkdir sock, error code: $status" 1>&2
             echo "$0: FATAL: exit 13" 1>&2
             exit 13
         fi
     elif [[ -n $V_FLAG ]]; then
-        echo mkdir $V_FLAG sock
+        echo "mkdir -p -v sock"
     fi
 fi
 if [[ -z $N_FLAG ]]; then
-    chmod $V_FLAG 0700 sock
-    status="$?"
+    if [[ -n $V_FLAG ]]; then
+	chmod -v 0700 sock
+	status="$?"
+    else
+	chmod 0700 sock
+	status="$?"
+    fi
     if [[ $status -ne 0 ]]; then
         echo "$0: FATAL: chmod 0700 sock, error code: $status" 1>&2
         echo "$0: FATAL: exit 14" 1>&2
         exit 14
     fi
 elif [[ -n $V_FLAG ]]; then
-    echo chmod $V_FLAG 0700 sock
+    echo "chmod -v 0700 sock"
 fi 2>&1 | grep -v ' retained as '
 if [[ -z $N_FLAG && ! -w sock ]]; then
     echo "$0: FATAL: directory not writable: sock" 1>&2
@@ -362,27 +327,37 @@ if [[ -z $N_FLAG && ! -w sock ]]; then
 fi
 if [[ ! -d OLD ]]; then
     if [[ -z $N_FLAG ]]; then
-        mkdir $V_FLAG OLD
-        status="$?"
+	if [[ -n $V_FLAG ]]; then
+	    mkdir -p -v OLD
+	    status="$?"
+	else
+	    mkdir -p OLD
+	    status="$?"
+	fi
         if [[ ! -d OLD ]]; then
             echo "$0: FATAL cannot mkdir OLD, error code: $status" 1>&2
             echo "$0: FATAL: exit 16" 1>&2
             exit 16
         fi
     elif [[ -n $V_FLAG ]]; then
-        echo mkdir $V_FLAG OLD
+        echo "mkdir -p -v OLD"
     fi
 fi
 if [[ -z $N_FLAG ]]; then
-    chmod $V_FLAG 0700 OLD
-    status="$?"
+    if [[ -n $V_FLAG ]]; then
+	chmod -v 0700 OLD
+	status="$?"
+    else
+	chmod 0700 OLD
+	status="$?"
+    fi
     if [[ $status -ne 0 ]]; then
         echo "$0: FATAL: chmod 0700 OLD, error code: $status" 1>&2
         echo "$0: FATAL: exit 17" 1>&2
         exit 17
     fi
 elif [[ -n $V_FLAG ]]; then
-    echo chmod $V_FLAG 0700 OLD
+    echo "chmod -v 0700 OLD"
 fi 2>&1 | grep -v ' retained as '
 if [[ -z $N_FLAG && ! -w OLD ]]; then
     echo "$0: FATAL: directory not writable: OLD" 1>&2
@@ -391,27 +366,37 @@ if [[ -z $N_FLAG && ! -w OLD ]]; then
 fi
 if [[ ! -d from ]]; then
     if [[ -z $N_FLAG ]]; then
-        mkdir $V_FLAG from
-        status="$?"
+	if [[ -n $V_FLAG ]]; then
+	    mkdir -p -v from
+	    status="$?"
+	else
+	    mkdir -p from
+	    status="$?"
+	fi
         if [[ ! -d from ]]; then
             echo "$0: FATAL cannot mkdir from, error code: $status" 1>&2
             echo "$0: FATAL: exit 19" 1>&2
             exit 19
         fi
     elif [[ -n $V_FLAG ]]; then
-        echo mkdir $V_FLAG from
+        echo "mkdir -p -v from"
     fi
 fi
 if [[ -z $N_FLAG ]]; then
-    chmod $V_FLAG 0700 from
-    status="$?"
+    if [[ -n $V_FLAG ]]; then
+	chmod -v 0700 from
+	status="$?"
+    else
+	chmod 0700 from
+	status="$?"
+    fi
     if [[ $status -ne 0 ]]; then
         echo "$0: FATAL: chmod 0700 from, error code: $status" 1>&2
         echo "$0: FATAL: exit 20" 1>&2
         exit 20
     fi
 elif [[ -n $V_FLAG ]]; then
-    echo chmod $V_FLAG 0700 from
+    echo "chmod -v 0700 from"
 fi 2>&1 | grep -v ' retained as '
 if [[ -z $N_FLAG && ! -w from ]]; then
     echo "$0: FATAL: directory not writable: from" 1>&2
@@ -439,7 +424,7 @@ if [[ -f authorized_keys.LOCKED ]]; then
                 echo "rm -f authorized_keys"
             else
                 if [[ -n $V_FLAG ]]; then
-                    echo rm -f authorized_keys
+                    echo "rm -f authorized_keys"
                 fi
                 rm -f authorized_keys
                 if [[ -f authorized_keys ]]; then
@@ -469,7 +454,7 @@ if [[ -n $T_FLAG ]]; then
             fi
         else
             if [[ -n $V_FLAG ]]; then
-                echo touch "$file"
+                echo "touch $file"
             fi
             if [[ -z $N_FLAG ]]; then
                 touch "$file"
@@ -501,7 +486,7 @@ if [[ -z $S_FLAG ]]; then
     #
     export SORTED_TMP=
     if [[ -z $N_FLAG ]]; then
-        SORTED_TMP=$(mktemp sorted-$file.XXXXXX)
+        SORTED_TMP=$(mktemp "sorted-$file.XXXXXX")
         if [[ -z $SORTED_TMP || ! -w $SORTED_TMP ]]; then
             echo "$0: FATAL: cannot create a temporary writable file" 1>&2
             echo "$0: FATAL: exit 22" 1>&2
@@ -509,14 +494,14 @@ if [[ -z $S_FLAG ]]; then
         fi
         trap 'rm -f -- "$SORTED_TMP"' 0 1 2 3 15
     else
-        SORTED_TMP=$(mktemp -u sorted-$file.XXXXXX)
+        SORTED_TMP=$(mktemp -u sorted-"$file".XXXXXX)
     fi
     #
     if [[ -n $V_FLAG ]]; then
-        echo sort -u -k3 $file -o "$SORTED_TMP"
+        echo "sort -u -k3 $file -o $SORTED_TMP"
     fi
     if [[ -z $N_FLAG ]]; then
-        sort -u -k3 $file -o "$SORTED_TMP"
+        sort -u -k3 "$file" -o "$SORTED_TMP"
         status="$?"
     else
         status=0
@@ -534,11 +519,11 @@ if [[ -z $S_FLAG ]]; then
     if [[ -n $V_FLAG ]]; then
         echo "if cmp -s $file $SORTED_TMP; then ... fi"
     fi
-    if cmp -s $file "$SORTED_TMP"; then
+    if cmp -s "$file" "$SORTED_TMP"; then
         if [[ -n $V_FLAG ]]; then
             echo
             echo "# no change needed for $file"
-            echo rm -f "$SORTED_TMP"
+            echo "rm -f $SORTED_TMP"
         fi
         if [[ -z $N_FLAG ]]; then
             rm -f "$SORTED_TMP"
@@ -546,11 +531,16 @@ if [[ -z $S_FLAG ]]; then
     else
         if [[ -n $USER_GROUP ]]; then
             if [[ -n $V_FLAG ]]; then
-                echo chown "$V_FLAG" "$USER_GROUP" "$SORTED_TMP"
+                echo "chown -v $USER_GROUP $SORTED_TMP"
             fi
             if [[ -z $N_FLAG ]]; then
-                chown $V_FLAG "$USER_GROUP" "$SORTED_TMP" 2>&1 | grep -v ' retained as '
-                status="${PIPESTATUS[0]}"
+		if [[ -n $V_FLAG ]]; then
+		    chown -v "$USER_GROUP" "$SORTED_TMP" 2>&1 | grep -v ' retained as '
+		    status="${PIPESTATUS[0]}"
+		else
+		    chown "$USER_GROUP" "$SORTED_TMP" 2>&1 | grep -v ' retained as '
+		    status="${PIPESTATUS[0]}"
+		fi
             else
                 status=0
             fi
@@ -565,11 +555,16 @@ if [[ -z $S_FLAG ]]; then
             fi
         fi
         if [[ -n $V_FLAG ]]; then
-            echo chmod "$V_FLAG" 0400 "$SORTED_TMP"
+            echo "chmod -v 0400 $SORTED_TMP"
         fi
         if [[ -z $N_FLAG ]]; then
-            chmod $V_FLAG 0400 "$SORTED_TMP"
-            status="$?"
+	    if [[ -n $V_FLAG ]]; then
+		chmod -v 0400 "$SORTED_TMP"
+		status="$?"
+	    else
+		chmod 0400 "$SORTED_TMP"
+		status="$?"
+	    fi
             if [[ $status -ne 0 ]]; then
                 if [[ -z $F_FLAG ]]; then
                     echo "$0: FATAL: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
@@ -581,18 +576,23 @@ if [[ -z $S_FLAG ]]; then
             fi
         fi 2>&1 | grep -v ' retained as '
         if [[ -n $V_FLAG ]]; then
-            echo mv -f "$V_FLAG" "$SORTED_TMP" $file
+            echo "mv -f -v $SORTED_TMP $file"
         fi
         if [[ -z $N_FLAG ]]; then
-            mv -f $V_FLAG "$SORTED_TMP" $file
-            status="$?"
+	    if [[ -n $V_FLAG ]]; then
+		mv -f -v "$SORTED_TMP" "$file"
+		status="$?"
+	    else
+		mv -f "$SORTED_TMP" "$file"
+		status="$?"
+	    fi
             if [[ $status -ne 0 ]]; then
                 if [[ -z $F_FLAG ]]; then
-                    echo "$0: FATAL: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
+                    echo "$0: FATAL: mv -f $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
                     echo "$0: FATAL: exit 26" 1>&2
                     exit 26
                 else
-                    echo "$0: Warning: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
+                    echo "$0: Warning: mv -f $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
                 fi
             fi
         fi
@@ -625,7 +625,7 @@ if [[ -z $CAP_S_FLAG ]]; then
         else
             if [[ -z $N_FLAG ]]; then
                 if [[ -n $V_FLAG ]]; then
-                    echo touch known_hosts
+                    echo "touch known_hosts"
                 fi
                 touch known_hosts
                 status="$?"
@@ -672,7 +672,7 @@ if [[ -z $CAP_S_FLAG ]]; then
     #
     if [[ -z $KNOWN_HOSTS_CLEANUP ]]; then
         if [[ -n $V_FLAG ]]; then
-            echo sort -u known_hosts -o "$SORTED_TMP"
+            echo "sort -u known_hosts -o $SORTED_TMP"
         fi
         if [[ -z $N_FLAG ]]; then
             sort -u known_hosts -o "$SORTED_TMP"
@@ -691,15 +691,15 @@ if [[ -z $CAP_S_FLAG ]]; then
         fi
     else
         if [[ -n $V_FLAG ]]; then
-            echo "$PYTHON3 $KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP"
+            echo "$PYTHON3_PROG $KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP"
             echo
         fi
         if [[ -z $N_FLAG ]]; then
             if [[ -n $V_FLAG ]]; then
-                "$PYTHON3" "$KNOWN_HOSTS_CLEANUP" -v known_hosts >"$SORTED_TMP"
+                "$PYTHON3_PROG" "$KNOWN_HOSTS_CLEANUP" -v known_hosts >"$SORTED_TMP"
                 status="$?"
             else
-                "$PYTHON3" "$KNOWN_HOSTS_CLEANUP" known_hosts >"$SORTED_TMP"
+                "$PYTHON3_PROG" "$KNOWN_HOSTS_CLEANUP" known_hosts >"$SORTED_TMP"
                 status="$?"
             fi
         else
@@ -707,11 +707,11 @@ if [[ -z $CAP_S_FLAG ]]; then
         fi
         if [[ $status -ne 0 ]]; then
             if [[ -z $F_FLAG ]]; then
-                echo "$0: FATAL: $PYTHON3 $KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP, error code: $status" 1>&2
+                echo "$0: FATAL: $PYTHON3_PROG $KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP, error code: $status" 1>&2
                 echo "$0: FATAL: exit 32" 1>&2
                 exit 32
             else
-                echo "$0: Warning: $PYTHON3 $KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP, error code: $status" 1>&2
+                echo "$0: Warning: $PYTHON3_PROG $KNOWN_HOSTS_CLEANUP -v known_hosts > $SORTED_TMP, error code: $status" 1>&2
             fi
         fi
     fi
@@ -723,7 +723,7 @@ if [[ -z $CAP_S_FLAG ]]; then
         if [[ -n $V_FLAG ]]; then
             echo
             echo '# no change needed for known_hosts'
-            echo rm -f "$SORTED_TMP"
+            echo "rm -f $SORTED_TMP"
         fi
         if [[ -z $N_FLAG ]]; then
             rm -f "$SORTED_TMP"
@@ -731,11 +731,16 @@ if [[ -z $CAP_S_FLAG ]]; then
     else
         if [[ -n $USER_GROUP ]]; then
             if [[ -n $V_FLAG ]]; then
-                echo chown "$V_FLAG" "$USER_GROUP" "$SORTED_TMP"
+                echo "chown -v $USER_GROUP $SORTED_TMP"
             fi
             if [[ -z $N_FLAG ]]; then
-                chown $V_FLAG "$USER_GROUP" "$SORTED_TMP" 2>&1 | grep -v ' retained as '
-                status="${PIPESTATUS[0]}"
+		if [[ -n $V_FLAG ]]; then
+		    chown -v "$USER_GROUP" "$SORTED_TMP" 2>&1 | grep -v ' retained as '
+		    status="${PIPESTATUS[0]}"
+		else
+		    chown "$USER_GROUP" "$SORTED_TMP" 2>&1 | grep -v ' retained as '
+		    status="${PIPESTATUS[0]}"
+		fi
             else
                 status=0
             fi
@@ -750,11 +755,16 @@ if [[ -z $CAP_S_FLAG ]]; then
             fi
         fi
         if [[ -n $V_FLAG ]]; then
-            echo chmod "$V_FLAG" 0664 "$SORTED_TMP"
+            echo "chmod -v 0664 $SORTED_TMP"
         fi
         if [[ -z $N_FLAG ]]; then
-            chmod $V_FLAG 0664 "$SORTED_TMP"
-            status="$?"
+	    if [[ -n $V_FLAG ]]; then
+		chmod -v 0664 "$SORTED_TMP"
+		status="$?"
+	    else
+		chmod 0664 "$SORTED_TMP"
+		status="$?"
+	    fi
             if [[ $status -ne 0 ]]; then
                 if [[ -z $F_FLAG ]]; then
                     echo "$0: FATAL: chmod 0400 $SORTED_TMP, error code: $status" 1>&2
@@ -766,18 +776,23 @@ if [[ -z $CAP_S_FLAG ]]; then
             fi
         fi 2>&1 | grep -v ' retained as '
         if [[ -n $V_FLAG ]]; then
-            echo mv -f "$V_FLAG" "$SORTED_TMP" known_hosts
+            echo "mv -f -v $SORTED_TMP known_hosts"
         fi
         if [[ -z $N_FLAG ]]; then
-            mv -f $V_FLAG "$SORTED_TMP" known_hosts
-            status="$?"
+	    if [[ -n $V_FLAG ]]; then
+		mv -f -v "$SORTED_TMP" known_hosts
+		status="$?"
+	    else
+		mv -f "$SORTED_TMP" known_hosts
+		status="$?"
+	    fi
             if [[ $status -ne 0 ]]; then
                 if [[ -z $F_FLAG ]]; then
-                    echo "$0: FATAL: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
+                    echo "$0: FATAL: mv -f $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
                     echo "$0: FATAL: exit 35" 1>&2
                     exit 35
                 else
-                    echo "$0: Warning: mv -f $V_FLAG $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
+                    echo "$0: Warning: mv -f $SORTED_TMP SORTED_TMP, error code: $status" 1>&2
                 fi
             fi
         fi
@@ -797,59 +812,58 @@ if [[ -n $V_FLAG ]]; then
     echo '# Processing fileset permissions'
 fi
 if [[ -z $N_FLAG ]]; then
-    chmod $V_FLAG 0700 .
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
-            xargs $XARGS_V -0 chmod $V_FLAG 0400
+    if [[ -n $V_FLAG ]]; then
+	chmod -v 0700 .
+    else
+	chmod 0700 .
     fi
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
-            xargs $XARGS_V -0 chmod $V_FLAG 0400
+    if [[ -n $V_FLAG ]]; then
+	find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+	    xargs -r -t -0 chmod -v 0400
+    else
+	find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+	    xargs -r -0 chmod 0400
     fi
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
-            xargs $XARGS_V -0 chmod $V_FLAG 0400
+    if [[ -n $V_FLAG ]]; then
+	find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+	    xargs -r -t -0 chmod -v 0400
+    else
+	find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+	    xargs -r -0 chmod 0400
     fi
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
-            xargs $XARGS_V -0 chmod $V_FLAG 0444
+    if [[ -n $V_FLAG ]]; then
+	find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+	    xargs -r -t -0 chmod -v 0400
+    else
+	find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+	    xargs -r -0 chmod 0400
     fi
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
-            xargs $XARGS_V -0 chmod $V_FLAG 0600
+    if [[ -n $V_FLAG ]]; then
+	find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+	    xargs -r -t -0 chmod -v 0444
+    else
+	find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+	    xargs -r -0 chmod 0444
+    fi
+    if [[ -n $V_FLAG ]]; then
+	find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+	    xargs -r -t -0 chmod -v 0600
+    else
+	find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+	    xargs -r -0 chmod 0600
     fi
 elif [[ -n $V_FLAG ]]; then
-    echo chmod $V_FLAG 0700 .
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
-            xargs -0 echo chmod $V_FLAG 0400
-    fi
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
-            xargs -0 echo chmod $V_FLAG 0400
-    fi
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
-            xargs -0 echo chmod $V_FLAG 0400
-    fi
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
-            xargs -0 echo chmod $V_FLAG 0444
-    fi
-    SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print)
-    if [[ -n $SET ]]; then
-        find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
-            xargs -0 echo chmod $V_FLAG 0600
-    fi
+    echo "chmod -v 0700 ."
+    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+	xargs -r -0 echo "chmod -v 0400"
+    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+	xargs -r -0 echo "chmod -v 0400"
+    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+	xargs -r -0 echo "chmod -v 0400"
+    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+	xargs -r -0 echo "chmod -v 0444"
+    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+	xargs -r -0 echo "chmod -v 0600"
 fi 2>&1 | grep -v ' retained as '
 if [[ -n $V_FLAG ]]; then
     echo
@@ -862,59 +876,58 @@ if [[ -n $USER_GROUP ]]; then
         echo '# Processing fileset ownerships'
     fi
     if [[ -z $N_FLAG ]]; then
-        chown $V_FLAG "$USER_GROUP" .
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
-                xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
-        fi
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
-                xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
-        fi
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
-                xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
-        fi
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
-                xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
-        fi
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
-                xargs $XARGS_V -0 chown $V_FLAG "$USER_GROUP"
+	if [[ -n $V_FLAG ]]; then
+	    chown -v "$USER_GROUP" .
+	else
+	    chown "$USER_GROUP" .
+	fi
+	if [[ -n $V_FLAG ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+		xargs -r -t -0 chown -v "$USER_GROUP"
+	else
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+		xargs -r -0 chown "$USER_GROUP"
+	fi
+	if [[ -n $V_FLAG ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+		xargs -r -t -0 chown -v "$USER_GROUP"
+	else
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+		xargs -r -0 chown "$USER_GROUP"
+	fi
+	if [[ -n $V_FLAG ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+		xargs -r -t -0 chown -v "$USER_GROUP"
+	else
+	    find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+		xargs -r -0 chown "$USER_GROUP"
+	fi
+	if [[ -n $V_FLAG ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+		xargs -r -t -0 chown -v "$USER_GROUP"
+	else
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+		xargs -r -0 chown "$USER_GROUP"
+	fi
+	if [[ -n $V_FLAG ]]; then
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+		xargs -r -t -0 chown -v "$USER_GROUP"
+	else
+	    find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+		xargs -r -0 chown "$USER_GROUP"
         fi
     elif [[ -n $V_FLAG ]]; then
-        echo chown $V_FLAG "$USER_GROUP" .
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
-                xargs -0 echo chown $V_FLAG "$USER_GROUP"
-        fi
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
-                xargs -0 echo chown $V_FLAG "$USER_GROUP"
-        fi
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
-                xargs -0 echo chown $V_FLAG "$USER_GROUP"
-        fi
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
-                xargs -0 echo chown $V_FLAG "$USER_GROUP"
-        fi
-        SET=$(find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print)
-        if [[ -n $SET ]]; then
-            find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
-                xargs -0 echo chown $V_FLAG "$USER_GROUP"
-        fi
+        echo "chown -v $USER_GROUP" .
+	find . -mindepth 1 -maxdepth 1 -type f -name 'authorized_keys*' -print0 |
+	    xargs -r -0 echo "chown -v $USER_GROUP"
+	find . -mindepth 1 -maxdepth 1 -type f -name 'config*' -print0 |
+	    xargs -r -0 echo "chown -v $USER_GROUP"
+	find . -mindepth 1 -maxdepth 1 -type f ! -name 'id_rsa.pub*' -name 'id_rsa*' -print0 |
+	    xargs -r -0 echo "chown -v $USER_GROUP"
+	find . -mindepth 1 -maxdepth 1 -type f -name 'id_rsa.pub*' -print0 |
+	    xargs -r -0 echo "chown -v $USER_GROUP"
+	find . -mindepth 1 -maxdepth 1 -type f -name 'known_hosts*' -print0 |
+	    xargs -r -0 echo "chown -v $USER_GROUP"
     fi 2>&1 | grep -v ' retained as '
     if [[ -n $V_FLAG ]]; then
         echo
@@ -1000,13 +1013,18 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
     fi
     if ! cmp -s "$src" "$date_file"; then
         if [[ -n $V_FLAG ]]; then
-            echo "cp -f -p $V_FLAG $src $date_file"
+            echo "cp -f -p -v $src $date_file"
         fi
         if [[ -z $N_FLAG ]]; then
-            cp -f -p $V_FLAG "$src" "$date_file"
-            status="$?"
+	    if [[ -n $V_FLAG ]]; then
+		cp -f -p -v "$src" "$date_file"
+		status="$?"
+	    else
+		cp -f -p "$src" "$date_file"
+		status="$?"
+	    fi
             if [[ $status -ne 0 ]]; then
-                echo "$0: FATAL: cp -f -p $V_FLAG $src $date_file, error code: $status" 1>&2
+                echo "$0: FATAL: cp -f -p $src $date_file, error code: $status" 1>&2
                 echo "$0: FATAL: exit 37" 1>&2
                 exit 37
             fi
@@ -1038,16 +1056,16 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
     # When we have id_rsa.LOCKED we need to form a dated file
     # as if we have id_rsa while using the contents of id_rsa.LOCKED
     #
-    elif [[ $file == "id_rsa" && -f id_rsa.LOCKED ]]; then
-        src="id_rsa.LOCKED"
+elif [[ $file == "id_rsa" && -f id_rsa.LOCKED ]]; then
+    src="id_rsa.LOCKED"
 
     # deal with the case where we have id_rsa.pub
     #
     # When we have id_rsa.pub.LOCKED we need to form a dated file
     # as if we have id_rsa.pub while using the contents of id_rsa.pub.LOCKED
     #
-    elif [[ $file == "id_rsa.pub" && -f id_rsa.pub.LOCKED ]]; then
-        src="id_rsa.pub.LOCKED"
+elif [[ $file == "id_rsa.pub" && -f id_rsa.pub.LOCKED ]]; then
+    src="id_rsa.pub.LOCKED"
     fi
 
     if [[ ! -f $src && -n $I_FLAG ]]; then
@@ -1061,20 +1079,25 @@ for file in authorized_keys config id_rsa id_rsa.pub known_hosts; do
         -name "$file"'.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]' -o \
         -name "$file"'.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][a-z]' \) |
         sort -r | awk 'NR != 1 {print $0;}' | while read -r i; do
-        if [[ -z $N_FLAG ]]; then
-            mv -f $V_FLAG "$i" OLD
-            status="$?"
-            if [[ $status -ne 0 ]]; then
-                echo "$0: Warning: mv -f $V_FLAG $i OLD, error code: $status" 1>&2
+            if [[ -z $N_FLAG ]]; then
+		if [[ -n $V_FLAG ]]; then
+		    mv -f -V "$i" OLD
+		    status="$?"
+		else
+		    mv -f "$i" OLD
+		    status="$?"
+		fi
+                if [[ $status -ne 0 ]]; then
+                    echo "$0: Warning: mv -f $i OLD, error code: $status" 1>&2
+                fi
+            elif [[ -n $V_FLAG ]]; then
+                echo "mv -f -v $i OLD"
             fi
-        elif [[ -n $V_FLAG ]]; then
-            echo mv -f $V_FLAG "$i" OLD
-        fi
+        done
     done
-done
-if [[ -n $V_FLAG ]]; then
-    echo
-fi
+    if [[ -n $V_FLAG ]]; then
+        echo
+    fi
 
 # move old top level from- and no- files
 #
@@ -1084,13 +1107,18 @@ fi
 find . -mindepth 1 -maxdepth 1 -type f \( -name 'from-*' -o -name 'no-*' \) -print |
     while read -r i; do
         if [[ -z $N_FLAG ]]; then
-            mv -f $V_FLAG "$i" OLD
-            status="$?"
+	    if [[ -n $V_FLAG ]]; then
+		mv -f -v "$i" OLD
+		status="$?"
+	    else
+		mv -f "$i" OLD
+		status="$?"
+	    fi
             if [[ $status -ne 0 ]]; then
-                echo "$0: Warning: mv -f $V_FLAG $i OLD, error code: $status" 1>&2
+                echo "$0: Warning: mv -f $i OLD, error code: $status" 1>&2
             fi
         elif [[ -n $V_FLAG ]]; then
-            echo mv -f $V_FLAG "$i" OLD
+            echo "mv -f -v $i OLD"
         fi
     done
 
@@ -1140,11 +1168,11 @@ if [[ -z $CAP_C_FLAG ]]; then
                 -iname '*\.May' -o -iname '*\.Jun' -o -iname '*\.Jul' -o -iname '*\.Aug' -o \
                 -iname '*\.Sep' -o -iname '*\.Oct' -o -iname '*\.Nov' -o -iname '*\.Dec' \) \
                 -print -delete 2>/dev/null
-        else
-            find OLD -type f \( -iname '*\.Jan' -o -iname '*\.Feb' -o -iname '*\.Mar' -o -iname '*\.Apr' -o \
-                -iname '*\.May' -o -iname '*\.Jun' -o -iname '*\.Jul' -o -iname '*\.Aug' -o \
-                -iname '*\.Sep' -o -iname '*\.Oct' -o -iname '*\.Nov' -o -iname '*\.Dec' \) \
-                -delete 2>/dev/null
+	else
+	    find OLD -type f \( -iname '*\.Jan' -o -iname '*\.Feb' -o -iname '*\.Mar' -o -iname '*\.Apr' -o \
+		-iname '*\.May' -o -iname '*\.Jun' -o -iname '*\.Jul' -o -iname '*\.Aug' -o \
+		-iname '*\.Sep' -o -iname '*\.Oct' -o -iname '*\.Nov' -o -iname '*\.Dec' \) \
+		-delete 2>/dev/null
         fi
     else
         if [[ -n $V_FLAG ]]; then
@@ -1173,27 +1201,35 @@ if [[ -z $CAP_C_FLAG ]]; then
         find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]' -print 2>/dev/null |
             while read -r i; do
                 if [[ -n $V_FLAG ]]; then
-                    # SC2001: See if you can use ${variable//search/replace} instead.
-                    # shellcheck disable=SC2001
-                    echo mv -f -v "$i" "$(echo "$i" |
-                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
+                    echo -n "mv -f -v $i "
+		    # Given the complexity of the regex, we use echo | sed anyway
+		    #
+		    # SC2001: See if you can use ${variable//search/replace} instead.
+		    # https://www.shellcheck.net/wiki/SC2001
+		    #
+		    # shellcheck disable=SC2001
+		    echo "$i" | sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/'
                 fi
                 # SC2001: See if you can use ${variable//search/replace} instead.
                 # shellcheck disable=SC2001
                 mv -f "$i" "$(echo "$i" |
                     sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
-            done
-    else
-        if [[ -n $V_FLAG ]]; then
-            echo '# listing mv commands that would be performed but for use of -n'
-            find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]' -print 2>/dev/null |
-                while read -r i; do
-                    # SC2001: See if you can use ${variable//search/replace} instead.
-                    # shellcheck disable=SC2001
-                    echo mv -f -v "$i" "$(echo "$i" |
-                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
                 done
-        fi
+            else
+                if [[ -n $V_FLAG ]]; then
+                    echo '# listing mv commands that would be performed but for use of -n'
+                    find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]' -print 2>/dev/null |
+                        while read -r i; do
+                            echo -nm "mv -f -v $i "
+			    # Given the complexity of the regex, we use echo | sed anyway
+			    #
+                            # SC2001: See if you can use ${variable//search/replace} instead.
+			    # https://www.shellcheck.net/wiki/SC2001
+			    #
+                            # shellcheck disable=SC2001
+                            echo "$i" | sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\.[0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/'
+                            done
+                fi
     fi
     if [[ -n $V_FLAG ]]; then
         echo
@@ -1213,27 +1249,35 @@ if [[ -z $CAP_C_FLAG ]]; then
         find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]$' -print 2>/dev/null |
             while read -r i; do
                 if [[ -n $V_FLAG ]]; then
-                    # SC2001: See if you can use ${variable//search/replace} instead.
-                    # shellcheck disable=SC2001
-                    echo mv -f -v "$i" "$(echo "$i" |
-                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
+                    echo -n "mv -f -v $i "
+		    # Given the complexity of the regex, we use echo | sed anyway
+		    #
+		    # SC2001: See if you can use ${variable//search/replace} instead.
+		    # https://www.shellcheck.net/wiki/SC2001
+		    #
+		    # shellcheck disable=SC2001
+                    echo "$i" | sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/'
                 fi
                 # SC2001: See if you can use ${variable//search/replace} instead.
                 # shellcheck disable=SC2001
                 mv -f "$i" "$(echo "$i" |
                     sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
-            done
-    else
-        if [[ -n $V_FLAG ]]; then
-            echo '# listing mv commands that would be performed but for use of -n'
-            find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]$' -print 2>/dev/null |
-                while read -r i; do
-                    # SC2001: See if you can use ${variable//search/replace} instead.
-                    # shellcheck disable=SC2001
-                    echo mv -f -v "$i" "$(echo "$i" |
-                        sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/')"
                 done
-        fi
+            else
+                if [[ -n $V_FLAG ]]; then
+                    echo '# listing mv commands that would be performed but for use of -n'
+                    find OLD -type f -name '*\.[0-9][0-9][0-9][0-9][0-9][0-9]$' -print 2>/dev/null |
+                        while read -r i; do
+                            echo -n "mv -f -v $i "
+			    # Given the complexity of the regex, we use echo | sed anyway
+			    #
+                            # SC2001: See if you can use ${variable//search/replace} instead.
+			    # https://www.shellcheck.net/wiki/SC2001
+			    #
+                            # shellcheck disable=SC2001
+                            echo "$i" | sed -e 's/^\(.*\.\)\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\120\2/'
+			done
+                fi
     fi
     if [[ -n $V_FLAG ]]; then
         echo
@@ -1247,11 +1291,11 @@ fi
 #
 if [[ -z $D_FLAG && -n $SHA256SUM_PROG ]]; then
     for dir in OLD from; do
-	if [[ -n $V_FLAG ]]; then
-	    echo "# remove selective duplicate files under $dir"
-	fi
-	RM_SET=$(find "$dir" -type f -print0 2>/dev/null | xargs -0 "$SHA256SUM_PROG" -- 2>/dev/null | sort |
-		    awk 'NF==2 && $2!="-" {if ($1 == prev) {for (i=2;i<=NF;i++) {print $i;}} prev=$1;}')
+        if [[ -n $V_FLAG ]]; then
+            echo "# remove selective duplicate files under $dir"
+        fi
+        RM_SET=$(find "$dir" -type f -print0 2>/dev/null | xargs -r -0 "$SHA256SUM_PROG" -- 2>/dev/null | sort |
+            awk 'NF==2 && $2!="-" {if ($1 == prev) {for (i=2;i<=NF;i++) {print $i;}} prev=$1;}')
 	if [[ -n $RM_SET ]]; then
 	    if [[ -n $V_FLAG ]]; then
 		echo "# these duplicate files under $dir may be removed:"
@@ -1261,15 +1305,15 @@ if [[ -z $D_FLAG && -n $SHA256SUM_PROG ]]; then
 	    if [[ -z $N_FLAG ]]; then
 		if [[ -n $V_FLAG ]]; then
 		    echo "# removing duplicate files under $dir:"
-		    find "$dir" -type f -print0 2>/dev/null | xargs -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
+		    find "$dir" -type f -print0 2>/dev/null | xargs -r -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
 			awk '{print $NF, $0}' | sort |
 			awk '$2~"SHA256" && $NF-1!="-" {if ($NF == prev) {for (i=3;i<NF-1;i++) {printf("%s ",$i);}printf("\n");} prev=$NF;}' |
-			sed -e 's/^(//' -e 's/) $//' | tr '\012' '\000' | sed -e 's/\\n/\n/' | xargs -0 -n 1 rm -f -v
+			sed -e 's/^(//' -e 's/) $//' | tr '\012' '\000' | sed -e 's/\\n/\n/' | xargs -r -0 -n 1 rm -f -v
 		else
-		    find "$dir" -type f -print0 2>/dev/null | xargs -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
+		    find "$dir" -type f -print0 2>/dev/null | xargs -r -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
 			awk '{print $NF, $0}' | sort |
 			awk '$2~"SHA256" && $NF-1!="-" {if ($NF == prev) {for (i=3;i<NF-1;i++) {printf("%s ",$i);}printf("\n");} prev=$NF;}' |
-			sed -e 's/^(//' -e 's/) $//' | tr '\012' '\000' | sed -e 's/\\n/\n/' | xargs -0 -n 1 rm -f
+			sed -e 's/^(//' -e 's/) $//' | tr '\012' '\000' | sed -e 's/\\n/\n/' | xargs -r -0 -n 1 rm -f
 		fi
 	    fi
 	else
