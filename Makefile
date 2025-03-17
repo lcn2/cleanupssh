@@ -32,6 +32,7 @@
 # utilities #
 #############
 
+ID= id
 INSTALL= install
 SHELL= bash
 
