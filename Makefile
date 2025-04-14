@@ -47,7 +47,8 @@ SHELL= bash
 V=@:
 #V=@
 
-DESTDIR= /usr/local/sbin
+PREFIX= /usr/local
+DESTDIR= ${PREFIX}/bin
 
 TARGETS= cleanupssh known_hosts_cleanup
 
