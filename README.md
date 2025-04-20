@@ -1,41 +1,43 @@
 # cleanupssh
 
-cleanup a .ssh directory, set permissions, clean up known_hosts, create backup of critical files
+Cleanup a .ssh directory, set permissions, clean up known_hosts, create backup of critical files.
 
 
-## TL;DR
-
-
-### To install:
+# To install
 
 ```sh
 sudo make install
 ```
 
-### For a demo, try:
+
+# Examples
 
 ```sh
-rm -rf RMME; cp -r ~/.ssh RMME 2>/dev/null
+$ rm -rf RMME; cp -r ~/.ssh RMME 2>/dev/null
 
-/usr/local/sbin/cleanupssh -n -v -f RMME
+$ /usr/local/sbin/cleanupssh -n -v -f RMME
 
-/usr/local/sbin/cleanupssh -v -f RMME
+$ /usr/local/sbin/cleanupssh -v -f RMME
 
-/usr/local/sbin/cleanupssh -f RMME
+$ /usr/local/sbin/cleanupssh -f RMME
 
-/usr/local/sbin/cleanupssh RMME
+$ /usr/local/sbin/cleanupssh RMME
 
-rm -rf RMME
+$ rm -rf RMME
 ```
 
-# Typical use:
+
+# To use
+
+## Typical use:
 
 ```sh
 /usr/local/sbin/cleanupssh ~/.ssh
 ```
 
 
-## Usage
+## Full command line options
+
 
 ```
 /usr/local/sbin/cleanupssh [-n] [-v] [-f] [-i] [-t] [-s] [-S] [-C] [-d] [-p khc_path]
