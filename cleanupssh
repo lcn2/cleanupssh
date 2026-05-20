@@ -32,7 +32,7 @@
 
 # setup
 #
-export VERSION="3.5.0 2025-05-20"
+export VERSION="3.5.0 2026-05-20"
 PYTHON3_PROG=$(type -P python3)
 export PYTHON3_PROG
 SHA256SUM_PROG=$(type -P sha256sum)
