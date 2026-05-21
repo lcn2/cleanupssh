@@ -91,4 +91,8 @@ install: all
 	@if [[ $$(${ID} -u) != 0 ]]; then echo "ERROR: must be root to make $@" 1>&2; exit 2; fi
 	${INSTALL} -m 0755 -d ${DESTDIR}
 	${INSTALL} -m 0555 ${TARGETS} ${DESTDIR}
+	@if [[ -d ~chongo/dot/tool ]]; then \
+	    echo ${INSTALL} -m 0555 ${TARGETS} ~chongo/dot/tool ; \
+	    ${INSTALL} -m 0555 ${TARGETS} ~chongo/dot/tool ; \
+	fi
 	${V} echo DEBUG =-= $@ end =-=
