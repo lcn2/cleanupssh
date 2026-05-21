@@ -32,7 +32,7 @@
 
 # setup
 #
-export VERSION="3.5.1 2026-05-21"
+export VERSION="3.5.2 2026-05-21"
 PYTHON3_PROG=$(type -P python3)
 export PYTHON3_PROG
 SHA256SUM_PROG=$(type -P sha256sum)
@@ -1348,6 +1348,9 @@ fi
 if [[ -n $V_FLAG ]]; then
     echo "# final state of $dir/from"
     ls -la "$dir/from"
+    echo
+    echo "# final contests of $dir/authorized_keys"
+    cat "$dir/authorized_keys"
     echo
     echo "# final state of $dir"
     ls -la
