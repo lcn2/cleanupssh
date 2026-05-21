@@ -32,7 +32,7 @@
 
 # setup
 #
-export VERSION="3.5.2 2026-05-21"
+export VERSION="3.5.3 2026-05-21"
 PYTHON3_PROG=$(type -P python3)
 export PYTHON3_PROG
 SHA256SUM_PROG=$(type -P sha256sum)
@@ -1097,7 +1097,7 @@ for file in authorized_keys config id_ed25519 id_ed25519.pub id_rsa id_rsa.pub k
         sort -r | awk 'NR != 1 {print $0;}' | while read -r i; do
             if [[ -z $N_FLAG ]]; then
 		if [[ -n $V_FLAG ]]; then
-		    mv -f -V "$i" OLD
+		    mv -f -v "$i" OLD
 		    status="$?"
 		else
 		    mv -f "$i" OLD
