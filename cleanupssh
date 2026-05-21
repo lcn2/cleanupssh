@@ -32,7 +32,7 @@
 
 # setup
 #
-export VERSION="3.5.0 2026-05-20"
+export VERSION="3.5.1 2026-05-21"
 PYTHON3_PROG=$(type -P python3)
 export PYTHON3_PROG
 SHA256SUM_PROG=$(type -P sha256sum)
@@ -1306,27 +1306,27 @@ fi
 # we remove all but one of those duplicates.
 #
 if [[ -z $D_FLAG && -n $SHA256SUM_PROG ]]; then
-    for dir in OLD from; do
+    for d in OLD from; do
         if [[ -n $V_FLAG ]]; then
-            echo "# remove selective duplicate files under $dir"
+            echo "# remove selective duplicate files under $d"
         fi
-        RM_SET=$(find "$dir" -type f -print0 2>/dev/null | xargs -r -0 "$SHA256SUM_PROG" -- 2>/dev/null | sort |
+        RM_SET=$(find "$d" -type f -print0 2>/dev/null | xargs -r -0 "$SHA256SUM_PROG" -- 2>/dev/null | sort |
             awk 'NF==2 && $2!="-" {if ($1 == prev) {for (i=2;i<=NF;i++) {print $i;}} prev=$1;}')
 	if [[ -n $RM_SET ]]; then
 	    if [[ -n $V_FLAG ]]; then
-		echo "# these duplicate files under $dir may be removed:"
+		echo "# these duplicate files under $d may be removed:"
 		echo "$RM_SET"
 	    fi
 	    # safe removal that takes care of files with newlines, and other whitespace
 	    if [[ -z $N_FLAG ]]; then
 		if [[ -n $V_FLAG ]]; then
-		    echo "# removing duplicate files under $dir:"
-		    find "$dir" -type f -print0 2>/dev/null | xargs -r -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
+		    echo "# removing duplicate files under $d:"
+		    find "$d" -type f -print0 2>/dev/null | xargs -r -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
 			awk '{print $NF, $0}' | sort |
 			awk '$2~"SHA256" && $NF-1!="-" {if ($NF == prev) {for (i=3;i<NF-1;i++) {printf("%s ",$i);}printf("\n");} prev=$NF;}' |
 			sed -e 's/^(//' -e 's/) $//' | tr '\012' '\000' | sed -e 's/\\n/\n/' | xargs -r -0 -n 1 rm -f -v
 		else
-		    find "$dir" -type f -print0 2>/dev/null | xargs -r -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
+		    find "$d" -type f -print0 2>/dev/null | xargs -r -0 "$SHA256SUM_PROG" --tag -- 2>/dev/null |
 			awk '{print $NF, $0}' | sort |
 			awk '$2~"SHA256" && $NF-1!="-" {if ($NF == prev) {for (i=3;i<NF-1;i++) {printf("%s ",$i);}printf("\n");} prev=$NF;}' |
 			sed -e 's/^(//' -e 's/) $//' | tr '\012' '\000' | sed -e 's/\\n/\n/' | xargs -r -0 -n 1 rm -f
@@ -1334,7 +1334,7 @@ if [[ -z $D_FLAG && -n $SHA256SUM_PROG ]]; then
 	    fi
 	else
 	    if [[ -n $V_FLAG ]]; then
-		echo "# no duplicate files under $dir need to be removed"
+		echo "# no duplicate files under $d need to be removed"
 	    fi
 	fi
 	if [[ -n $V_FLAG ]]; then
@@ -1346,6 +1346,9 @@ fi
 # All Done!!! -- Jessica Noll, Age 2
 #
 if [[ -n $V_FLAG ]]; then
+    echo "# final state of $dir/from"
+    ls -la "$dir/from"
+    echo
     echo "# final state of $dir"
     ls -la
     echo
