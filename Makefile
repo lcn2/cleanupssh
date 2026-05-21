@@ -2,6 +2,8 @@
 #
 # cleanupssh - cleanup a .ssh directory, fix permission and missing sub-dirs
 #
+# Copyright (c) 2015-2020,2023-2026 by Landon Curt Noll.  All Rights Reserved.
+#
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
 # provided that the above copyright, this permission notice and text
@@ -48,7 +50,8 @@ V=@:
 #V=@
 
 PREFIX= /usr/local
-DESTDIR= ${PREFIX}/bin
+DESTDIR= ${PREFIX}/sbin
+WRONG_DESTDIR= ${PREFIX}/bin
 
 TARGETS= cleanupssh known_hosts_cleanup
 
@@ -89,6 +92,14 @@ clobber quick_clobber: clean
 install: all
 	${V} echo DEBUG =-= $@ start =-=
 	@if [[ $$(${ID} -u) != 0 ]]; then echo "ERROR: must be root to make $@" 1>&2; exit 2; fi
+	@if [[ -f ${WRONG_DESTDIR}/cleanupssh ]]; then \
+	    echo "${RM} -f ${WRONG_DESTDIR}/cleanupssh" ; \
+	    ${RM} -f ${WRONG_DESTDIR}/cleanupssh ; \
+	fi
+	@if [[ -f ${WRONG_DESTDIR}/known_hosts_cleanup ]]; then \
+	    echo "${RM} -f ${WRONG_DESTDIR}/known_hosts_cleanup" ; \
+	    ${RM} -f ${WRONG_DESTDIR}/known_hosts_cleanup ; \
+	fi
 	${INSTALL} -m 0755 -d ${DESTDIR}
 	${INSTALL} -m 0555 ${TARGETS} ${DESTDIR}
 	@if [[ -d ~chongo/dot/tool ]]; then \
